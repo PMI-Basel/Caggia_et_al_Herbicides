@@ -8,7 +8,7 @@ rm(list=ls())
 
 #### CHANGE THIS PATHS ####
 source <- "YOUR_PATH"
-taxa_database <- "YOUR_PATH/sh_general_release_dynamic_02.02.2019.fasta"
+taxa_database <- "YOUR_PATH/database_file"
 ##########################
 
 

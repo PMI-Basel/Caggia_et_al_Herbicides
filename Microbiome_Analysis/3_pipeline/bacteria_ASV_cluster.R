@@ -8,7 +8,7 @@ rm(list=ls())
 
 #### CHANGE THIS PATHS ####
 source <- "YOUR_PATH"
-taxa_database <- "YOUR_PATH/silva_nr_v132_train_set.fa.gz"
+taxa_database <- "YOUR_PATH/database_file"
 ##########################
 
 
