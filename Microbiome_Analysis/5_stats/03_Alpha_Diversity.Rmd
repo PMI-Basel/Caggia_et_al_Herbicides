@@ -1,0 +1,699 @@
+---
+title: "Herbicide - 03: Alpha Diversity"
+author: "Jan Waelchli"
+geometry: margin=2cm
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 3
+---
+
+\pagebreak
+
+```{r setup, include=FALSE, echo=F, warning=F, message=F,}
+
+##clear the object from memory
+rm(list=ls())
+
+#knitr settings
+knitr::opts_chunk$set(echo=TRUE, fig.align="center")
+options(tinytex.verbose = TRUE)
+
+#set seed
+set.seed(100)
+
+## set source to file location
+library(rstudioapi)
+setwd(dirname(getActiveDocumentContext()$path))
+
+## load functions
+source("functions/functions.R")
+functions(path="functions/")
+
+## install (if necessary) and load libraries
+libraries()
+
+```
+
+```{r import, echo=F, message=F, warning=F}
+
+# Import
+
+# set wd to RDS files
+setwd("interim/01_Import_Normalization")
+
+#cImport RDS files
+bDESIGN <- readRDS("bDESIGN.RDS")
+bDAT <- readRDS("bDAT.RDS")
+bDAT_rare <- readRDS("bDAT_rare.RDS")
+b_rare <- readRDS("b_rare.RDS")
+
+fDESIGN <- readRDS("fDESIGN.RDS")
+fDAT <- readRDS("fDAT.RDS")
+fDAT_rare <- readRDS("fDAT_rare.RDS")
+f_rare <- readRDS("f_rare.RDS")
+
+level_cols_Herbicide <- readRDS("level_cols_Herbicide.RDS")
+level_cols_Spraying <- readRDS("level_cols_Spraying.RDS")
+
+```
+   
+
+# Alpha diversity
+
+We answered the following questions for the bacterial and fungal alpha diversity:  
+
+* **Q1: Are there differences in alpha diversity between the spraying applications?**
+* **Q2: Are there differences in alpha diversity between the herbicide treatments?**
+
+\vspace{10mm}
+
+## Rarefaction
+
+Before analyzing the alpha diversity, we conducted the rarefaction plot to make sure that no diversity was lost due to a too low rarefaction threshold.
+
+### Figure 3 | Rarefaction
+
+\vspace{5mm}
+
+```{r rarefaction, eval=T, echo=F, message=F, warning=F, fig.height=4, fig.width=10}
+
+#BACTERIA
+
+#rarefy
+pdf("/dev/null") #prevents drawing of standard rarefaction plot (we will create our own with colors)
+brarefaction <- vegan::rarecurve(t(bDAT), step=200, 7000, label = FALSE)
+names(brarefaction) <- bDESIGN$Label
+invisible(dev.off())
+
+# long-transformation.
+protox <- mapply(FUN = function(x, y) {
+  mydf <- as.data.frame(x)
+  colnames(mydf) <- "value"
+  mydf$species <- y
+  mydf$subsample <- attr(x, "Subsample")
+  mydf
+}, x = brarefaction, y = as.list(names(brarefaction)), SIMPLIFY = FALSE)
+
+brarefaction_long <- do.call(rbind, protox)
+rownames(brarefaction_long) <- NULL  # pretty
+
+#add Experiment
+brarefaction_long$Experiment <- NA
+for (i in 1:nrow(brarefaction_long)) {
+  brarefaction_long$Experiment[i] <- as.character(bDESIGN$Experiment[bDESIGN$Label == brarefaction_long$species[i]])
+}
+
+#add Herbicide
+brarefaction_long$Herbicide <- NA
+for (i in 1:nrow(brarefaction_long)) {
+  brarefaction_long$Herbicide[i] <- as.character(bDESIGN$Herbicide[bDESIGN$Label == brarefaction_long$species[i]])
+}
+
+#plot
+bac_rareplot <- ggplot(brarefaction_long, aes(x = subsample, y = value, group = species)) +
+                  theme_bw() +
+                  geom_line(aes(color=Herbicide, lty=Experiment))+
+                  scale_color_manual(values = level_cols_Herbicide)+
+                  xlab("Sequencing Depth")+
+                  ylab("Number of ASVs")+
+                  ggtitle("Bacteria: Rarefaction")+
+                  geom_vline(xintercept = b_rare, lty=2, lwd=1, col="dimgrey")
+
+#FUNGI
+
+#rarefy
+pdf("/dev/null") #prevents drawing of standard rarefaction plot (we will create our own with colors)
+frarefaction <- vegan::rarecurve(t(fDAT), step=20, 7000, label = FALSE)
+names(frarefaction) <- fDESIGN$Label
+invisible(dev.off())
+
+# long-transformation.
+protox <- mapply(FUN = function(x, y) {
+  mydf <- as.data.frame(x)
+  colnames(mydf) <- "value"
+  mydf$species <- y
+  mydf$subsample <- attr(x, "Subsample")
+  mydf
+}, x = frarefaction, y = as.list(names(frarefaction)), SIMPLIFY = FALSE)
+
+frarefaction_long <- do.call(rbind, protox)
+rownames(frarefaction_long) <- NULL  # pretty
+
+#add Experiment
+frarefaction_long$Experiment <- NA
+for (i in 1:nrow(frarefaction_long)) {
+  frarefaction_long$Experiment[i] <- as.character(fDESIGN$Experiment[fDESIGN$Label == frarefaction_long$species[i]])
+}
+
+#add Herbicide
+frarefaction_long$Herbicide <- NA
+for (i in 1:nrow(frarefaction_long)) {
+  frarefaction_long$Herbicide[i] <- as.character(fDESIGN$Herbicide[fDESIGN$Label == frarefaction_long$species[i]])
+}
+
+#plot
+fun_rareplot <- ggplot(frarefaction_long, aes(x = subsample, y = value, group = species)) +
+                  theme_bw() +
+                  geom_line(aes(color=Herbicide, lty=Experiment))+
+                  scale_color_manual(values = level_cols_Herbicide)+
+                  xlab("Sequencing Depth")+
+                  ylab("Number of ASVs")+
+                  ggtitle("Fungi: Rarefaction")+
+                  geom_vline(xintercept = f_rare, lty=2, lwd=1, col="dimgrey")
+
+#combine the two plots (library cowplot)
+plot <- plot_grid(bac_rareplot + theme(legend.position="none"),
+               fun_rareplot + theme(legend.position="none") + labs(colour=""),
+               #labels=c("A","B"),
+               align = "hv",
+               nrow=1)
+
+legend <- get_legend(bac_rareplot + theme(legend.position="bottom") + labs(fill="Experiment"))
+fig4 <- plot_grid(plot, legend, nrow=2, rel_heights=c(1, .1))
+
+#print
+#png("figures/fig4.png",7000, 3200, res = 600)
+fig4
+#dev.off()
+
+```
+
+\vspace{5mm}
+
+**Conclusion:** We chose rarefaction thresholds that do not affect the alpha diversity.
+
+\pagebreak
+
+## Method
+
+We rarefied the dataset by the sequencing depth of `r b_rare` for bacteria and `r f_rare` for fungi and calculated the Shannon diversity as a index for alpha diversity for each sample. This was repeated 100 times. Then, the mean value from the 100 iterations was taken for statistical analysis between the different samples.  
+
+```{r a-div shannon, warning=F, echo=F, message=F, eval=T}
+
+### BACTERIA ###
+
+repetitions <- 100
+
+  #rarefy data a 100 time and calculate each time the alpha diversity (shannon)
+  #differs each time because rarefaction is a random process
+  diversity_bDAT_mat <- c()
+  for (i in 1:repetitions){
+    #generate rarefied community
+    set.seed(i)#change seed every round, otherwise rrarefy will always have the same output
+    temp_mat <- t(rrarefy(t(bDAT), b_rare))
+    #calculate shannon
+    shannon <- vegan::diversity(temp_mat, index="shannon", MARGIN=2)
+    d <- exp(shannon)
+    #combine
+    diversity_bDAT_mat <- cbind(diversity_bDAT_mat, d)
+  }
+
+#calculate means of subsamples
+asv_diversity <- rowMeans(diversity_bDAT_mat)
+#put them all in one dataframe
+alpha_diversity_bDAT_summary <- cbind(asv_diversity, bDESIGN)
+
+
+### FUNGI ###
+
+  #rarefy data a 100 time and calculate each time the alpha diversity (shannon)
+  #differs each time because rarefaction is a random process
+  diversity_fDAT_mat <- c()
+  for (i in 1:repetitions){
+    #generate rarefied community
+    temp_mat <- t(rrarefy(t(fDAT), f_rare))
+    #calculate shannon
+    shannon <- vegan::diversity(temp_mat, index="shannon", MARGIN=2)
+    d <- exp(shannon)
+    #combine
+    diversity_fDAT_mat <- cbind(diversity_fDAT_mat, d)
+  }
+
+#calculate means of subsamples
+asv_diversity <- rowMeans(diversity_fDAT_mat)
+#put them all in one dataframe
+alpha_diversity_fDAT_summary <- cbind(asv_diversity, fDESIGN)
+
+
+```
+
+## Effect of all factors on alpha diversity
+
+Before answering the questions, we got an overview for both experiments by investigating the effect on alpha diversity by the factors of different herbicides, different spraying targets, time, any of their interactions and technical lab artefacts (the DNA extraction and PCR amplification was done on two plates). We modeled the alpha diversity against these factors in an aov-model and performed a F-Test.
+
+### Bacteria
+
+```{r a-div all bacteria tp * hc in exp1, warning=F, echo=F, message=F, eval=T}
+
+### BACTERIA
+
+#split dataset by experiments
+exp1_alpha_diversity_bDAT_summary <- droplevels(alpha_diversity_bDAT_summary[alpha_diversity_bDAT_summary$Experiment==1,])
+exp1_bDESIGN <- droplevels(bDESIGN[bDESIGN$Experiment==1,])
+
+exp2_alpha_diversity_bDAT_summary <- droplevels(alpha_diversity_bDAT_summary[alpha_diversity_bDAT_summary$Experiment==2,])
+exp2_bDESIGN <- droplevels(bDESIGN[bDESIGN$Experiment==2,])
+
+#all
+#F test for sample groups by Spraying
+exp1_balpha_all_aov <- aov(asv_diversity ~ Herbicide * Spraying * Timepoint + Plate, data=exp1_alpha_diversity_bDAT_summary)
+pander(summary(exp1_balpha_all_aov), caption = "Bacteria, experiment 1: F test")
+
+exp2_balpha_all_aov <- aov(asv_diversity ~ Herbicide * Spraying * Timepoint + Plate, data=exp2_alpha_diversity_bDAT_summary)
+pander(summary(exp2_balpha_all_aov), caption = "Bacteria, experiment 2: F test")
+
+```
+
+\pagebreak
+
+### Fungi
+
+```{r a-div all fungi tp * hc in exp1, warning=F, echo=F, message=F, eval=T}
+
+### FUNGI
+
+#split dataset by experiments
+exp1_alpha_diversity_fDAT_summary <- droplevels(alpha_diversity_fDAT_summary[alpha_diversity_fDAT_summary$Experiment==1,])
+exp1_fDESIGN <- droplevels(fDESIGN[fDESIGN$Experiment==1,])
+
+exp2_alpha_diversity_fDAT_summary <- droplevels(alpha_diversity_fDAT_summary[alpha_diversity_fDAT_summary$Experiment==2,])
+exp2_fDESIGN <- droplevels(fDESIGN[fDESIGN$Experiment==2,])
+
+#all
+#F test for sample groups by Spraying
+exp1_falpha_all_aov <- aov(asv_diversity ~ Herbicide * Spraying * Timepoint + Plate, data=exp1_alpha_diversity_fDAT_summary)
+pander(summary(exp1_falpha_all_aov), caption = "Fungi, experiment 1: F test")
+
+exp2_falpha_all_aov <- aov(asv_diversity ~ Herbicide * Spraying * Timepoint + Plate, data=exp2_alpha_diversity_fDAT_summary)
+pander(summary(exp2_falpha_all_aov), caption = "Fungi, experiment 2: F test")
+
+
+#export for paper
+
+#combine tables
+df1 <- cbind(Taxa="Bacteria", Experiment="Experiment1", Factor=rownames(summary(exp1_balpha_all_aov)[[1]]), summary(exp1_balpha_all_aov)[[1]])
+df2 <- cbind(Taxa="Bacteria", Experiment="Experiment2", Factor=rownames(summary(exp2_balpha_all_aov)[[1]]), summary(exp2_balpha_all_aov)[[1]])
+df3 <- cbind(Taxa="Fungi", Experiment="Experiment1", Factor=rownames(summary(exp1_falpha_all_aov)[[1]]), summary(exp1_falpha_all_aov)[[1]])
+df4 <- cbind(Taxa="Fungi", Experiment="Experiment2", Factor=rownames(summary(exp2_falpha_all_aov)[[1]]), summary(exp2_falpha_all_aov)[[1]])
+df_all <- rbind(df1, df2, df3, df4)
+rownames(df_all) <- NULL
+rm(df1, df2, df3, df4)
+
+#save
+#write.csv(df_all, "paper_tables/alpha_diversity.csv", row.names = F)
+
+
+
+```
+
+
+**Conclusion:** We see a strong effect on the alpha diversity between the two plates for bacteria and fungi. Samples were randomized on the two plates. We are not interested in differences between the two plates, that's why we kept the "plate-treatment" in the following models as a factor so that effects of the other factors were quantified while accounting for the plate variance. In bacteria, the alpha diversity changed over time. Spraying on different targets and using different herbicides did not significantly influence the alpha diversity. For fungi, spraying either on weeds or direct on soil affected the alpha diversity while the time nor the herbicide had a significant influence.
+
+\pagebreak
+
+## Spraying effect
+
+**Q1: Are there differences in alpha diversity between the spraying applications?**  
+The herbicide was either sprayed directly on soil or on weeds. While we couldn't find any effect on the alpha diversity in bacterial communities, we found differences for fungi. We further investigated for both experiments how the different spraying targets did shape the communities. For consistency we investigated the bacterial and fungal communities.
+
+### Bacteria
+
+```{r a-div spraying effect bac, warning=F, echo=F, message=F, eval=T}
+
+### BACTERIA ###
+
+## Experiment 1 ##
+
+### pair-wise tests
+alpha_Spraying_aov_tukey <- emmeans::emmeans(exp1_balpha_all_aov, "Spraying")  # library(emmeans)
+alpha_Spraying_aov_tukey_letters <- multcomp::cld(alpha_Spraying_aov_tukey, Letter="abcdefghi", alpha=0.05)
+row.names(alpha_Spraying_aov_tukey_letters) <- alpha_Spraying_aov_tukey_letters[,1]
+alpha_Spraying_aov_tukey_letters <- alpha_Spraying_aov_tukey_letters[levels(exp1_bDESIGN$Spraying),]
+# means
+alpha_Spraying_means <- aggregate(exp1_alpha_diversity_bDAT_summary$asv_diversity,list(exp1_alpha_diversity_bDAT_summary$Spraying), mean)
+row.names(alpha_Spraying_means) <- alpha_Spraying_means[,1]
+alpha_Spraying_means <- alpha_Spraying_means[levels(exp1_bDESIGN$Spraying),]
+# table
+alpha_table_Spraying <- cbind(Shannon=alpha_Spraying_means[,2], alpha_Spraying_aov_tukey_letters[,2:7])
+alpha_table_Spraying <- alpha_table_Spraying[,c(1,7)]
+
+pander(alpha_table_Spraying, caption = "Bacteria: Spraying effect in experiment 1")
+
+
+## Experiment 2 ##
+
+### pair-wise tests
+alpha_Spraying_aov_tukey <- emmeans::emmeans(exp2_balpha_all_aov, "Spraying")  # library(emmeans)
+alpha_Spraying_aov_tukey_letters <- multcomp::cld(alpha_Spraying_aov_tukey, Letter="abcdefghi", alpha=0.05)
+row.names(alpha_Spraying_aov_tukey_letters) <- alpha_Spraying_aov_tukey_letters[,1]
+alpha_Spraying_aov_tukey_letters <- alpha_Spraying_aov_tukey_letters[levels(exp2_bDESIGN$Spraying),]
+# means
+alpha_Spraying_means <- aggregate(exp2_alpha_diversity_bDAT_summary$asv_diversity,list(exp2_alpha_diversity_bDAT_summary$Spraying), mean)
+row.names(alpha_Spraying_means) <- alpha_Spraying_means[,1]
+alpha_Spraying_means <- alpha_Spraying_means[levels(exp2_bDESIGN$Spraying),]
+# table
+alpha_table_Spraying <- cbind(Shannon=alpha_Spraying_means[,2], alpha_Spraying_aov_tukey_letters[,2:7])
+alpha_table_Spraying <- alpha_table_Spraying[,c(1,7)]
+
+pander(alpha_table_Spraying, caption = "Bacteria: Spraying effect in experiment 2")
+
+```
+
+### Fungi
+
+```{r a-div spraying effect fungi, warning=F, echo=F, message=F, eval=T}
+
+### FUNGI ###
+
+## Experiment 1 ##
+
+### pair-wise tests
+alpha_Spraying_aov_tukey <- emmeans::emmeans(exp1_falpha_all_aov, "Spraying")  # library(emmeans)
+alpha_Spraying_aov_tukey_letters <- multcomp::cld(alpha_Spraying_aov_tukey, Letter="abcdefghi", alpha=0.05)
+row.names(alpha_Spraying_aov_tukey_letters) <- alpha_Spraying_aov_tukey_letters[,1]
+alpha_Spraying_aov_tukey_letters <- alpha_Spraying_aov_tukey_letters[levels(exp1_fDESIGN$Spraying),]
+# means
+alpha_Spraying_means <- aggregate(exp1_alpha_diversity_fDAT_summary$asv_diversity,list(exp1_alpha_diversity_fDAT_summary$Spraying), mean)
+row.names(alpha_Spraying_means) <- alpha_Spraying_means[,1]
+alpha_Spraying_means <- alpha_Spraying_means[levels(exp1_fDESIGN$Spraying),]
+# table
+alpha_table_Spraying <- cbind(Shannon=alpha_Spraying_means[,2], alpha_Spraying_aov_tukey_letters[,2:7])
+alpha_table_Spraying <- alpha_table_Spraying[,c(1,7)]
+
+pander(alpha_table_Spraying, caption = "Fungi: Spraying effect in experiment 1")
+
+
+## Experiment 2 ##
+
+### pair-wise tests
+alpha_Spraying_aov_tukey <- emmeans::emmeans(exp2_falpha_all_aov, "Spraying")  # library(emmeans)
+alpha_Spraying_aov_tukey_letters <- multcomp::cld(alpha_Spraying_aov_tukey, Letter="abcdefghi", alpha=0.05)
+row.names(alpha_Spraying_aov_tukey_letters) <- alpha_Spraying_aov_tukey_letters[,1]
+alpha_Spraying_aov_tukey_letters <- alpha_Spraying_aov_tukey_letters[levels(exp2_fDESIGN$Spraying),]
+# means
+alpha_Spraying_means <- aggregate(exp2_alpha_diversity_fDAT_summary$asv_diversity,list(exp2_alpha_diversity_fDAT_summary$Spraying), mean)
+row.names(alpha_Spraying_means) <- alpha_Spraying_means[,1]
+alpha_Spraying_means <- alpha_Spraying_means[levels(exp2_fDESIGN$Spraying),]
+# table
+alpha_table_Spraying <- cbind(Shannon=alpha_Spraying_means[,2], alpha_Spraying_aov_tukey_letters[,2:7])
+alpha_table_Spraying <- alpha_table_Spraying[,c(1,7)]
+
+pander(alpha_table_Spraying, caption = "Fungi: Spraying effect in experiment 2")
+
+```
+
+### Figure 4.1 | Shannon diversity - Spraying
+
+\vspace{5mm}
+
+```{r plot a-div spraying, echo=F, message=F, warning=F, eval=T, fig.height=5, fig.width=8}
+
+### BACTERIA
+
+#data frame for letters
+letters <- data.frame(label=c(rep("a",4)),
+                      Spraying=rep(c("weeds", "soil"), 2),
+                      Experiment=rep(c("Experiment 1","Experiment 2"),each=2),
+                      x=c(rep(c(1:2),2)),
+                      y=c(800,800,800,800))
+
+alpha_diversity_bDAT_summary$Timepoint <- as.factor(alpha_diversity_bDAT_summary$Timepoint)
+levels(alpha_diversity_bDAT_summary$Experiment) <- c("Experiment 1", "Experiment 2")
+
+
+#plot
+bac_plot <- ggplot(alpha_diversity_bDAT_summary, aes(y=asv_diversity, x=Spraying, fill=Spraying)) +
+              geom_boxplot(position=position_dodge2(width=0.75, preserve="single"),outlier.colour = NA, alpha=0.7) +
+              geom_jitter(aes(shape=Timepoint), size=2, position=position_jitterdodge(jitter.width=0.7,dodge.width = 0.75), alpha=0.3)+
+              theme_bw() +
+              theme(legend.position="none") +
+              ylab("Shanon Diversity")+
+              xlab("")+
+              scale_fill_manual(values=level_cols_Spraying) +
+              scale_shape_manual(values=c(15,17)) +
+              facet_grid(.~ Experiment) +
+              labs(title = "Bacteria: Alpha Diversity", subtitle = "Alpha Diversity ~ Herbicide * Spraying * Timepoint + Plate")+
+              #labs(subtitle = "Alpha Diversity ~ Herbicide * Spraying * Timepoint + Plate")+
+              theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), plot.subtitle=element_text(size=10))+
+              geom_text(data = letters, aes(x = x, y = y, label = label, Spraying=Spraying),size=5, col="dimgrey")
+
+
+### FUNGI
+
+#data frame for letters
+letters <- data.frame(label=c("a", "b", "b", "a"),
+                      Spraying=rep(c("weeds", "soil"), 2),
+                      Experiment=rep(c("Experiment 1","Experiment 2"),each=2),
+                      x=c(rep(c(1:2),2)),
+                      y=c(58,58,58,58))
+
+alpha_diversity_fDAT_summary$Timepoint <- as.factor(alpha_diversity_fDAT_summary$Timepoint)
+levels(alpha_diversity_fDAT_summary$Experiment) <- c("Experiment 1", "Experiment 2")
+
+
+#plot
+fun_plot <- ggplot(alpha_diversity_fDAT_summary, aes(y=asv_diversity, x=Spraying, fill=Spraying)) +
+              geom_boxplot(position=position_dodge2(width=0.75, preserve="single"),outlier.colour = NA, alpha=0.7) +
+              geom_jitter(aes(shape=Timepoint), size=2, position=position_jitterdodge(jitter.width=0.7,dodge.width = 0.75), alpha=0.3)+
+              theme_bw() +
+              theme(legend.position="none") +
+              ylab("Shanon Diversity")+
+              xlab("")+
+              scale_fill_manual(values=level_cols_Spraying) +
+              scale_shape_manual(values=c(15,17)) +
+              facet_grid(.~ Experiment) +
+              labs(title = "Fungi: Alpha Diversity", subtitle = "Alpha Diversity ~ Herbicide * Spraying * Timepoint + Plate")+
+              #labs(subtitle = "Alpha Diversity ~ Herbicide * Spraying * Timepoint + Plate")+
+              theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), plot.subtitle=element_text(size=10))+
+              geom_text(data = letters, aes(x = x, y = y, label = label, Spraying=Spraying),size=5, col="dimgrey")
+
+
+
+### PLOT
+
+#combine the two plots (library cowplot)
+fig4.1 <- plot_grid(bac_plot + theme(legend.position="none"),
+               fun_plot + theme(legend.position="none") + labs(colour=""),
+               #labels=c("A","B"),
+               align = "hv",
+               nrow=1)
+
+#for paper
+#saveRDS(fig4.1, "paper_figs/RDS/fig4.1.RDS")
+
+#add legend
+legend <- get_legend(bac_plot + theme(legend.position="bottom") + labs(fill="Spraying"))
+fig4.1 <- plot_grid(fig4.1, legend, nrow=2, rel_heights=c(1, .1))
+
+#print
+#png("figures/fig4.1.png",6400, 4000, res = 600)
+fig4.1
+#dev.off()
+
+
+```
+
+\vspace{5mm}
+
+**Conclusion:** As already seen, bacterial alpha diversity remains constant between the two spraying targets. In experiment 1 led spraying on weeds to a higher fungal alpha diversity while we observed the opposite effect in experiment 2.
+
+\vspace{5mm}
+
+## Herbicide effect
+
+**Q2: Are there differences in alpha diversity between the herbicide treatments?**  
+We treated samples either with water (control), glyphosate or terbuthylazine. We saw above that the different herbicides did not influence the bacterial nor fungal alpha diversity.
+
+```{r a-div Herbicide effect bac, warning=F, echo=F, message=F, eval=T}
+
+# ### BACTERIA ###
+# 
+# ## Experiment 1 ##
+# 
+# ### pair-wise tests
+# alpha_Herbicide_aov_tukey <- emmeans(exp1_balpha_all_aov, "Herbicide")  # library(emmeans)
+# alpha_Herbicide_aov_tukey_letters <- cld(alpha_Herbicide_aov_tukey, Letter="abcdefghi", alpha=0.05)
+# row.names(alpha_Herbicide_aov_tukey_letters) <- alpha_Herbicide_aov_tukey_letters[,1]
+# alpha_Herbicide_aov_tukey_letters <- alpha_Herbicide_aov_tukey_letters[levels(exp1_bDESIGN$Herbicide),]
+# # means
+# alpha_Herbicide_means <- aggregate(exp1_alpha_diversity_bDAT_summary$asv_diversity,list(exp1_alpha_diversity_bDAT_summary$Herbicide), mean)
+# row.names(alpha_Herbicide_means) <- alpha_Herbicide_means[,1]
+# alpha_Herbicide_means <- alpha_Herbicide_means[levels(exp1_bDESIGN$Herbicide),]
+# # table
+# alpha_table_Herbicide <- cbind(Shannon=alpha_Herbicide_means[,2], alpha_Herbicide_aov_tukey_letters[,2:7])
+# alpha_table_Herbicide <- alpha_table_Herbicide[,c(1,7)]
+# 
+# pander(alpha_table_Herbicide, caption = "Bacteria: Herbicide effect in experiment 1")
+# 
+# 
+# ## Experiment 2 ##
+# 
+# ### pair-wise tests
+# alpha_Herbicide_aov_tukey <- emmeans(exp2_balpha_all_aov, "Herbicide")  # library(emmeans)
+# alpha_Herbicide_aov_tukey_letters <- cld(alpha_Herbicide_aov_tukey, Letter="abcdefghi", alpha=0.05)
+# row.names(alpha_Herbicide_aov_tukey_letters) <- alpha_Herbicide_aov_tukey_letters[,1]
+# alpha_Herbicide_aov_tukey_letters <- alpha_Herbicide_aov_tukey_letters[levels(exp2_bDESIGN$Herbicide),]
+# # means
+# alpha_Herbicide_means <- aggregate(exp2_alpha_diversity_bDAT_summary$asv_diversity,list(exp2_alpha_diversity_bDAT_summary$Herbicide), mean)
+# row.names(alpha_Herbicide_means) <- alpha_Herbicide_means[,1]
+# alpha_Herbicide_means <- alpha_Herbicide_means[levels(exp2_bDESIGN$Herbicide),]
+# # table
+# alpha_table_Herbicide <- cbind(Shannon=alpha_Herbicide_means[,2], alpha_Herbicide_aov_tukey_letters[,2:7])
+# alpha_table_Herbicide <- alpha_table_Herbicide[,c(1,7)]
+# 
+# pander(alpha_table_Herbicide, caption = "Bacteria: Herbicide effect in experiment 2")
+
+```
+
+```{r a-div Herbicide effect fungi, warning=F, echo=F, message=F, eval=T}
+
+# ### FUNGI ###
+# 
+# ## Experiment 1 ##
+# 
+# ### pair-wise tests
+# alpha_Herbicide_aov_tukey <- emmeans(exp1_falpha_all_aov, "Herbicide")  # library(emmeans)
+# alpha_Herbicide_aov_tukey_letters <- cld(alpha_Herbicide_aov_tukey, Letter="abcdefghi", alpha=0.05)
+# row.names(alpha_Herbicide_aov_tukey_letters) <- alpha_Herbicide_aov_tukey_letters[,1]
+# alpha_Herbicide_aov_tukey_letters <- alpha_Herbicide_aov_tukey_letters[levels(exp1_fDESIGN$Herbicide),]
+# # means
+# alpha_Herbicide_means <- aggregate(exp1_alpha_diversity_fDAT_summary$asv_diversity,list(exp1_alpha_diversity_fDAT_summary$Herbicide), mean)
+# row.names(alpha_Herbicide_means) <- alpha_Herbicide_means[,1]
+# alpha_Herbicide_means <- alpha_Herbicide_means[levels(exp1_fDESIGN$Herbicide),]
+# # table
+# alpha_table_Herbicide <- cbind(Shannon=alpha_Herbicide_means[,2], alpha_Herbicide_aov_tukey_letters[,2:7])
+# alpha_table_Herbicide <- alpha_table_Herbicide[,c(1,7)]
+# 
+# pander(alpha_table_Herbicide, caption = "Fungi: Herbicide effect in experiment 1")
+# 
+# 
+# ## Experiment 2 ##
+# 
+# ### pair-wise tests
+# alpha_Herbicide_aov_tukey <- emmeans(exp2_falpha_all_aov, "Herbicide")  # library(emmeans)
+# alpha_Herbicide_aov_tukey_letters <- cld(alpha_Herbicide_aov_tukey, Letter="abcdefghi", alpha=0.05)
+# row.names(alpha_Herbicide_aov_tukey_letters) <- alpha_Herbicide_aov_tukey_letters[,1]
+# alpha_Herbicide_aov_tukey_letters <- alpha_Herbicide_aov_tukey_letters[levels(exp2_fDESIGN$Herbicide),]
+# # means
+# alpha_Herbicide_means <- aggregate(exp2_alpha_diversity_fDAT_summary$asv_diversity,list(exp2_alpha_diversity_fDAT_summary$Herbicide), mean)
+# row.names(alpha_Herbicide_means) <- alpha_Herbicide_means[,1]
+# alpha_Herbicide_means <- alpha_Herbicide_means[levels(exp2_fDESIGN$Herbicide),]
+# # table
+# alpha_table_Herbicide <- cbind(Shannon=alpha_Herbicide_means[,2], alpha_Herbicide_aov_tukey_letters[,2:7])
+# alpha_table_Herbicide <- alpha_table_Herbicide[,c(1,7)]
+# 
+# pander(alpha_table_Herbicide, caption = "Fungi: Herbicide effect in experiment 2")
+
+```
+
+
+```{r plot a-div herbicides, echo=F, message=F, warning=F, eval=T, fig.height=5, fig.width=8}
+
+# ### Figure 4.3 | Shannon diversity - Herbicide
+# \vspace{5mm}
+
+# ### BACTERIA
+# 
+# #data frame for letters
+# letters <- data.frame(label=c(rep("a",6)),
+#                       Herbicide=rep(c("ctr", "gly", "soil"), 2),
+#                       Experiment=rep(c("Experiment 1","Experiment 2"),each=3),
+#                       x=c(rep(c(1:3),2)),
+#                       y=c(800,800,800,650,650,650))
+# 
+# alpha_diversity_bDAT_summary$Timepoint <- as.factor(alpha_diversity_bDAT_summary$Timepoint)
+# levels(alpha_diversity_bDAT_summary$Herbicide) <- c("ctr", "gly", "tb")
+# levels(alpha_diversity_bDAT_summary$Experiment) <- c("Experiment 1", "Experiment 2")
+# 
+# 
+# #plot
+# bac_plot <- ggplot(alpha_diversity_bDAT_summary, aes(y=asv_diversity, x=Herbicide, fill=Herbicide)) +
+#               geom_boxplot(position=position_dodge2(width=0.75, preserve="single"),outlier.colour = NA) +
+#               geom_jitter(size=1, position=position_jitterdodge(jitter.width=0.3,dodge.width = 0.75), alpha=0.3)+
+#               theme_bw() +
+#               theme(legend.position="none") +
+#               ylab("Shanon Diversity")+
+#               xlab("")+
+#               scale_fill_manual(values=level_cols_Herbicide) +
+#               facet_grid(.~ Experiment) +
+#               labs(title = "Bacteria: Alpha diversity", subtitle = "alpha diversity ~ Herbicide * Spraying * Timepoint + Plate")+
+#               theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), plot.subtitle=element_text(size=10))+
+#               geom_text(data = letters, aes(x = x, y = y, label = label, Herbicide=Herbicide),size=5, col="dimgrey")
+# 
+# 
+# ### FUNGI
+# 
+# #data frame for letters
+# letters <- data.frame(label=c(rep("a",6)),
+#                       Herbicide=rep(c("ctr", "gly", "soil"), 2),
+#                       Experiment=rep(c("Experiment 1","Experiment 2"),each=3),
+#                       x=c(rep(c(1:3),2)),
+#                       y=c(58,58,58,58,58,58))
+# 
+# alpha_diversity_fDAT_summary$Timepoint <- as.factor(alpha_diversity_fDAT_summary$Timepoint)
+# levels(alpha_diversity_fDAT_summary$Herbicide) <- c("ctr", "gly", "tb")
+# levels(alpha_diversity_fDAT_summary$Experiment) <- c("Experiment 1", "Experiment 2")
+# 
+# 
+# #plot
+# fun_plot <- ggplot(alpha_diversity_fDAT_summary, aes(y=asv_diversity, x=Herbicide, fill=Herbicide)) +
+#               geom_boxplot(position=position_dodge2(width=0.75, preserve="single"),outlier.colour = NA) +
+#               geom_jitter(size=1, position=position_jitterdodge(jitter.width=0.3,dodge.width = 0.75), alpha=0.3)+
+#               theme_bw() +
+#               theme(legend.position="none") +
+#               ylab("Shanon Diversity")+
+#               xlab("")+
+#               scale_fill_manual(values=level_cols_Herbicide) +
+#               facet_grid(.~ Experiment) +
+#               labs(title = "Bacteria: Alpha diversity", subtitle = "alpha diversity ~ Herbicide * Spraying * Timepoint + Plate")+
+#               theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), plot.subtitle=element_text(size=10))+
+#               geom_text(data = letters, aes(x = x, y = y, label = label, Herbicide=Herbicide),size=5, col="dimgrey")
+# 
+# 
+# 
+# ### PLOT
+# 
+# #combine the two plots (library cowplot)
+# fig4.1 <- plot_grid(bac_plot + theme(legend.position="none"),
+#                fun_plot + theme(legend.position="none") + labs(colour=""),
+#                labels=c("A","B"),
+#                align = "hv",
+#                nrow=1)
+# 
+# #add legend
+# legend <- get_legend(bac_plot + theme(legend.position="bottom") + labs(fill="Spraying"))
+# fig4.1 <- plot_grid(fig4.1, legend, nrow=2, rel_heights=c(1, .1))
+# 
+# #print
+# #png("figures/fig4.1.png",6400, 4000, res = 600)
+# fig4.1
+# #dev.off()
+
+# \vspace{5mm}
+# **Conclusion:** As expected, the alpha diversity was not affected by the different herbicides.
+
+```
+
+\vspace{5mm}
+
+## Conclusion alpha diversity 
+
+A inconsistent effect on the fungal alpha diversity was found between the different spraying targets. The alpha diversity of bacteria and fungi did not changed between water control, glyphosate and terbuthylazine.
+
+```{r export RDA files, , echo=F, message=F, warning=F}
+
+# create directory
+dir.create("interim")
+dir.create("interim/03_Alpha_Diversity")
+
+## set output directory
+setwd("interim/03_Alpha_Diversity")
+
+#save objects needed in the following scripts as RDA
+saveRDS(alpha_diversity_bDAT_summary, "alpha_diversity_bDAT_summary.RDS")
+saveRDS(alpha_diversity_fDAT_summary, "alpha_diversity_fDAT_summary.RDS")
+
+```
+
+\pagebreak

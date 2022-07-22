@@ -1,0 +1,597 @@
+---
+title: "Herbicide - 01: Import & Normalization"
+author: "Jan Waelchli"
+geometry: margin=2cm
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 3
+
+---
+
+\pagebreak
+
+# Experimental Setup
+
+Two experiments were performed. In experiment 1 (exp1) we kept a constant 60% water holding capacity (WHC) while in experiment 2 (exp2) all pots were flushed (100% WHC) before keeping a constant 60% WHC. In both experiments, we had three Herbicide (Hc) treatments: water control (ctr), glyphosate (gly) and terbuthylazine (tb) which were sprayed on two different targets: Bare soil (S) or weeds (Ca; Chenopodium album). Two weeks after spraying, maize was planted in the soil. Soil samples were collected at: 2W (2 weeks after spraying, maize planting, 7 reps. per treatment) and 5W (5 weeks after spraying, 3 weeks old maize, 7 reps. per treatment).
+
+
+```{r setup, include=FALSE, echo=F, message=F, warning=F}
+
+##clear the objects from memory
+rm(list=ls())
+
+#knitr settings
+knitr::opts_chunk$set(echo=TRUE, fig.align="center")
+options(tinytex.verbose = TRUE)
+
+#set seed
+set.seed(100)
+
+## set source to file location
+if (!require(rstudioapi)){install.packages("rstudioapi")}; library(rstudioapi)
+setwd(dirname(getActiveDocumentContext()$path))
+
+#set paths
+paths <- list(DESIGN = c("../1_start/design.xlsx"),
+              bASV_table = c("../4_output/bacteria_ASV/bacteria_ASV.tab"),
+              fASV_table = c("../4_output/fungi_ASV/fungi_ASV.tab"),
+              btaxa = c("../4_output/bacteria_ASV/bacteria_taxa.tab"),
+              ftaxa = c("../4_output/fungi_ASV/fungi_taxa.tab"))
+
+## load functions
+source("functions/functions.R")
+functions(path="functions/")
+
+## install (if necessary) and load libraries
+libraries()
+
+```
+
+```{r import design, echo=F, message=F, warning=F}
+
+#import design file
+DESIGN <- readxl::read_excel(paths$DESIGN)
+
+#remove timpeoint t0
+DESIGN <- DESIGN[DESIGN$Timepoint != "0",]
+
+#change water to control
+DESIGN$Herbicide[DESIGN$Herbicide == "wat"] <- "ctr"
+
+
+#factors
+DESIGN$Experiment <- as.factor(DESIGN$Experiment)
+DESIGN$SampleType <- as.factor(DESIGN$SampleType)
+DESIGN$Herbicide <- factor(DESIGN$Herbicide, levels = c("ctr","gly","tb"))
+DESIGN$Spraying <- gsub("cheno", "weeds", DESIGN$Spraying)
+DESIGN$Spraying <- factor(DESIGN$Spraying, levels = c("soil","weeds"))
+DESIGN$Taxa <- as.factor(DESIGN$Taxa)
+
+#additional columns
+DESIGN$Spraying_Timepoint <- paste(DESIGN$Spraying, DESIGN$Timepoint, sep="_")
+DESIGN$Spraying_Timepoint <- factor(DESIGN$Spraying_Timepoint,
+                                    levels = c("soil_2", "weeds_2",
+                                               "soil_5", "weeds_5")) 
+
+DESIGN$group <- paste(DESIGN$Herbicide, DESIGN$Spraying, sep="_")
+DESIGN$group <- factor(DESIGN$group,
+                                    levels = c("ctr_soil","ctr_weeds",
+                                               "gly_soil","gly_weeds",
+                                               "tb_soil","tb_weeds"))
+
+DESIGN$group_experiment <- paste(DESIGN$group, DESIGN$Experiment, sep="_")
+DESIGN$group_experiment <- factor(DESIGN$group_experiment,
+                                    levels = c("ctr_soil_1","ctr_weeds_1",
+                                               "gly_soil_1","gly_weeds_1",
+                                               "tb_soil_1","tb_weeds_1",
+                                               "ctr_soil_2","ctr_weeds_2",
+                                               "gly_soil_2","gly_weeds_2",
+                                               "tb_soil_2","tb_weeds_2"))
+
+
+DESIGN$herbicide_timepoint <- as.factor(paste(DESIGN$Herbicide, DESIGN$Timepoint, sep="_"))
+DESIGN$herbicide_experiment_timepoint <- as.factor(paste(DESIGN$Herbicide, DESIGN$Experiment, DESIGN$Timepoint, sep="_"))
+DESIGN$spraying_experiment_timepoint <- as.factor(paste(DESIGN$spraying, DESIGN$Experiment, DESIGN$Timepoint, sep="_"))
+DESIGN$group_experiment_timepoint <- as.factor(paste(DESIGN$group_experiment, DESIGN$Timepoint, sep="_"))
+
+#colors
+DESIGN$cols_Herbicide <- NA
+DESIGN$cols_Herbicide[DESIGN$Herbicide=="ctr"] <- "#404788FF"
+DESIGN$cols_Herbicide[DESIGN$Herbicide=="gly"] <- "#55C667FF"
+DESIGN$cols_Herbicide[DESIGN$Herbicide=="tb"] <- "#FDE725FF"
+
+DESIGN$cols_Spraying <- NA
+DESIGN$cols_Spraying[DESIGN$Spraying=="soil"] <- "firebrick"
+DESIGN$cols_Spraying[DESIGN$Spraying=="weeds"] <- "dodgerblue"
+
+## collapsed color vectors
+temp <- data.frame(DESIGN$Herbicide, DESIGN$cols_Herbicide)
+temp <- plyr::ddply(temp, .variables="DESIGN.cols_Herbicide", .fun=unique)
+level_cols_Herbicide <- as.character(temp[,2])
+names(level_cols_Herbicide) <- temp[,1]
+
+temp <- data.frame(DESIGN$Spraying, DESIGN$cols_Spraying)
+temp <- plyr::ddply(temp, .variables="DESIGN.cols_Spraying", .fun=unique)
+level_cols_Spraying <- as.character(temp[,2])
+names(level_cols_Spraying) <- temp[,1]
+
+#split to bacteria and fungi
+bDESIGN <- DESIGN[DESIGN$Taxa=="b",]
+fDESIGN <- DESIGN[DESIGN$Taxa=="f",]
+
+```
+
+```{r DAT import, echo=F, message=F, warning=F, include=F}
+
+### BACTERIA ###
+
+#import ASV table
+all_bDAT <- read.delim(paths$bASV_table, header=T, row.names=1, sep="\t")
+all_bDAT <- t(all_bDAT)
+
+## sort in order of bDESIGN and delete other cols
+colnames(all_bDAT) <- substring(colnames(all_bDAT),1,7)
+bDAT <- as.data.frame(all_bDAT[, bDESIGN$Label])
+rm(all_bDAT)
+
+
+
+### FUNGI ###
+
+#import ASV table
+all_fDAT <- read.delim(paths$fASV_table, header=T, row.names=1, sep="\t")
+all_fDAT <- t(all_fDAT)
+
+## sort in order of fDESIGN and delete other cols
+colnames(all_fDAT) <- substring(colnames(all_fDAT),1,7)
+fDAT <- as.data.frame(all_fDAT[, fDESIGN$Label])
+rm(all_fDAT)
+
+```
+
+```{r bTAX import, echo=F, message=F, warning=F, include=F}
+
+### BACTERIA ###
+
+#import taxonomy table
+bTAX <- read.table(paths$btaxa, row.names=1, sep="\t", blank.lines.skip = FALSE)
+
+#rename
+colnames(bTAX) <- c("kingdom", "phylum", "class", "order", "family", "genus")
+rownames(bTAX) <- gsub(">ASV","ASV", rownames(bTAX))
+bTAX[is.na(bTAX)] <- "unassigned"
+
+# define ASVs for removal
+r1 <- -which(bTAX$kingdom=="Eukaryota")
+r2 <- -which(bTAX$phylum=="Cyanobacteria")
+r3 <- -which(bTAX$family=="Mitochondria")
+r4 <- -which(is.na(bTAX)) #rows all na
+ASVs_to_remove <- c(r1,r2,r3,r4)
+if(length(ASVs_to_remove)>0){
+  bTAX <- bTAX[ASVs_to_remove ,]
+  bDAT <- bDAT[rownames(bTAX),]
+}
+
+#add ASV_ID to bTAXonomy file
+bTAX$ASV_ID <- rownames(bTAX)
+
+#levels
+bTAX$phylum <- as.factor(bTAX$phylum)
+levels(bTAX$phylum)[levels(bTAX$phylum) < 2 ] <- "unassigned"
+# defining ASV colors by phylum (using the bTAXonomy file)
+bTAX$labels <- as.character(bTAX$phylum)
+# create separate bTAXonomy label specifying classes of Proteobacteria
+bTAX$class <- as.factor(bTAX$class)
+try(bTAX[ bTAX$class=="Alphaproteobacteria", ]$labels <- "Alphaproteobacteria")
+try(bTAX[ bTAX$class=="Betaproteobacteria", ]$labels <- "Betaproteobacteria")
+try(bTAX[ bTAX$class=="Gammaproteobacteria", ]$labels <- "Gammaproteobacteria")
+try(bTAX[ bTAX$class=="Deltaproteobacteria", ]$labels <- "Deltaproteobacteria")
+bTAX$labels <- as.factor(bTAX$labels)
+# vector of colors for abundant phyla (and classes for Proteobacteria)
+# will be used for graphs later
+bTAX$cols_phyla <- as.character(bTAX$labels)
+bTAX$cols_phyla <- "lightgrey"
+try(bTAX[ bTAX$labels=="Alphaproteobacteria" , ]$cols_phyla <- "palegreen1")
+try(bTAX[ bTAX$labels=="Betaproteobacteria" , ]$cols_phyla <- "palegreen3")
+try(bTAX[ bTAX$labels=="Gammaproteobacteria" , ]$cols_phyla <- "palegreen4")
+try(bTAX[ bTAX$labels=="Deltaproteobacteria" , ]$cols_phyla <- "olivedrab1")
+try(bTAX[ bTAX$labels=="Actinobacteria" , ]$cols_phyla <- "indianred2")
+try(bTAX[ bTAX$labels=="Bacteroidetes" , ]$cols_phyla <- "steelblue1")
+try(bTAX[ bTAX$labels=="Firmicutes" , ]$cols_phyla <- "tan1")
+try(bTAX[ bTAX$labels=="Acidobacteria" , ]$cols_phyla <- "lightsalmon4")
+try(bTAX[ bTAX$labels=="Chloroflexi" , ]$cols_phyla <- "gold1")
+try(bTAX[ bTAX$labels=="Verrucomicrobia", ]$cols_phyla <- "orchid3")
+try(bTAX[ bTAX$labels=="Gemmatimonadetes", ]$cols_phyla <- "peachpuff3")
+try(bTAX[ bTAX$labels=="Nanoarchaeaeota" , ]$cols_phyla <- "dodgerblue2")
+try(bTAX[ bTAX$labels=="Planctomycetes" , ]$cols_phyla <- "pink")
+try(bTAX[ bTAX$labels=="Thaumarchaeota" , ]$cols_phyla <- "goldenrod2")
+try(bTAX[ bTAX$labels=="Patescibacteria" , ]$cols_phyla <- "darkgoldenrod3")
+try(bTAX[ bTAX$labels=="Rokubacteria" , ]$cols_phyla <- "darkorchid3")
+## collapsed color vector for each level
+temp <- data.frame(bTAX$labels, bTAX$cols_phyla)
+temp <- plyr::ddply(temp, .variables="bTAX.labels", .fun=unique)
+bTAX_level_cols_phyla <- as.character(temp[,2])
+names(bTAX_level_cols_phyla) <- temp[,1]
+
+# remove no longer used files
+rm(temp)
+
+```
+
+```{r fTAX import, echo=F, message=F, warning=F, include=F}
+
+### FUNGI ###
+
+#import taxonomy table
+fTAX <- read.table(paths$ftaxa, row.names=1, sep="\t", blank.lines.skip = FALSE)
+
+#rename
+colnames(fTAX) <- c("kingdom", "phylum", "class", "order", "family", "genus")
+rownames(fTAX) <- gsub(">ASV","ASV", rownames(fTAX))
+fTAX[is.na(fTAX)] <- "unassigned"
+
+#rename fTAX
+colnames(fTAX) <- c("kingdom", "phylum", "class", "order", "family", "genus", "species")
+fTAX$kingdom <- gsub("k__","", fTAX$kingdom )
+fTAX$phylum <- gsub("p__","", fTAX$phylum )
+fTAX$class <- gsub("c__","", fTAX$class )
+fTAX$order <- gsub("o__","", fTAX$order )
+fTAX$family <- gsub("f__","", fTAX$family )
+fTAX$genus <- gsub("g__","", fTAX$genus )
+fTAX$species <- gsub("s__","", fTAX$species )
+
+# define ASVs for removal
+r1 <- -which(fTAX$kingdom=="Protista")
+r2 <- -which(fTAX$kingdom=="Plantae")
+r3 <- -which(fTAX$kingdom=="Protozoa")
+r4 <- -which(fTAX$kingdom=="Animalia")
+r5 <- -which(is.na(fTAX)) #rows all na
+ASVs_to_remove <- c(r1,r2,r3,r4, r5)
+if(length(ASVs_to_remove)>0){
+ fTAX <- fTAX[ASVs_to_remove ,]
+}
+
+#rename unassigned ASVs
+fTAX[is.na(fTAX)] <- "unassigned"
+
+#add ASV_ID to taxonomy file
+fTAX$ASV_ID <- rownames(fTAX)
+
+#levels
+fTAX$phylum <- as.factor(fTAX$phylum)
+levels(fTAX$phylum)[levels(fTAX$phylum) < 2 ] <- "unassigned"
+#Defining fASV colors by phylum (using the taxonomy file)
+fTAX$labels <- as.character(fTAX$phylum)
+fTAX$labels <- as.factor(fTAX$labels)
+levels(fTAX$labels)
+#vector of colors for abundant phyla 
+fTAX$cols_phyla <- fTAX$labels
+fTAX$cols_phyla <- "lightgrey"
+try(fTAX[fTAX$labels=="Ascomycota", ]$cols_phyla <- "dodgerblue2")
+try(fTAX[fTAX$labels=="Basidiomycota", ]$cols_phyla <- "firebrick1")
+try(fTAX[fTAX$labels=="Olpidiomycota", ]$cols_phyla <- "seagreen4")
+try(fTAX[fTAX$labels=="Chytridiomycota", ]$cols_phyla <- "goldenrod2")
+try(fTAX[fTAX$labels=="Mortierellomycota" , ]$cols_phyla <- "mediumorchid1")
+#collapsed color vector for each level
+temp <- data.frame(fTAX$labels, fTAX$cols_phyla)
+temp <- plyr::ddply(temp, .variables="fTAX.labels", .fun=unique)
+fTAX_level_cols_phyla <- as.character(temp[,2])
+names(fTAX_level_cols_phyla) <- temp[,1]
+
+# remove no longer used files
+rm(temp)
+
+```
+
+\vspace{10mm}
+
+# Description all data
+
+## Sequencing depth
+
+We show the sum, range and median over all samples. Eight bacterial samples were previous removed due to very low sequencing depth.
+
+### Bacteria
+
+```{r seq numbers bacteria, echo=F, message=F, warning=F}
+
+### BACTERIA ###
+
+#show sorted seq numbers
+#sort(colSums(bDAT),decreasing = T)
+
+#remove samples with very low seq numbers
+threshold <-  1000
+samples_to_remove <- names(which(colSums(bDAT) < threshold))
+
+print(paste(length(samples_to_remove),"samples removed"))
+#pander(sort(colSums(bDAT[,colnames(bDAT) %in% samples_to_remove]),decreasing=T))
+
+bDESIGN <- bDESIGN[!(bDESIGN$Label %in% samples_to_remove),]
+bDAT <- bDAT[,!(colnames(bDAT) %in% samples_to_remove)]
+ASVs_to_remove <- names(which(rowSums(bDAT) == 0))
+bTAX <- bTAX[!(rownames(bTAX) %in% ASVs_to_remove),]
+
+#seq numbers
+paste ("sum:", sum(colSums(bDAT)))
+paste (c("min:","max:"), range(colSums(bDAT)))
+paste ("median:", median(colSums(bDAT)))
+
+## define rarefication threshold 
+#(number of reads from the sample with the lowest seq-depth)
+b_rare <- floor(min(colSums(bDAT))/1000) * 1000 #round to the next lower 1000
+```
+
+### Fungi
+
+```{r seq numbers fungi, echo=F, message=F, warning=F}
+
+### FUNGI ###
+
+#show sorted seq numbers
+#sort(colSums(fDAT),decreasing = T)
+
+#remove samples with very low seq numbers
+# threshold <-  1000
+# samples_to_remove <- names(which(colSums(fDAT) < threshold))
+# pander(sort(colSums(fDAT[,colnames(fDAT) %in% samples_to_remove]),decreasing=T), caption="Bacteria: seq depth of removed samples")
+# 
+# fDESIGN <- fDESIGN[!(fDESIGN$Label %in% samples_to_remove),]
+# fDAT <- fDAT[,!(colnames(fDAT) %in% samples_to_remove)]
+# ASVs_to_remove <- names(which(rowSums(fDAT) == 0))
+# fTAX <- fTAX[!(rownames(fTAX) %in% ASVs_to_remove),]
+print("No samples removed")
+
+#seq numbers
+paste ("sum:", sum(colSums(fDAT)))
+paste (c("min:","max:"), range(colSums(fDAT)))
+paste ("median:", median(colSums(fDAT)))
+
+## define rarefication threshold 
+#(number of reads from the sample with the lowest seq-depth)
+f_rare <- floor(min(colSums(fDAT))/1000) * 1000  #round to the next lower 1000
+```
+
+### Figure 1 | Sequencing depth
+
+\vspace{5mm}
+
+```{r Figure 1 bacteria, fig.height=5, fig.width=8, echo=F, warning=F, message=F}
+
+## boxplot
+
+df <- data.frame(col_sum=colSums(bDAT),colnames=colnames(bDAT), Spraying=bDESIGN$Spraying, 
+                 Herbicide=bDESIGN$Herbicide, group=bDESIGN$group, Experiment=bDESIGN$Experiment, Timepoint=as.factor(bDESIGN$Timepoint),
+                 group_experiment_timepoint=bDESIGN$group_experiment_timepoint)
+
+levels(df$Experiment) <- c("Experiment 1", "Experiment 2")
+levels(df$Timepoint) <- c("2w", "5w")
+
+ylim2=boxplot.stats(df$col_sum)$stats[c(1, 5)]
+
+seq_nr <- ggplot2::ggplot(data=df, aes(x=Spraying, y=col_sum, fill=Herbicide)) + 
+                      geom_boxplot(position=position_dodge2(width=0.75, preserve="single"),outlier.colour = NA) + 
+                      geom_jitter(aes(col=Timepoint, group=group_experiment_timepoint), 
+                            size=1, position=position_jitterdodge(jitter.width=0,dodge.width = 0.75))+
+                      theme_bw() +
+                      theme(legend.position="none") +
+                      ylab("seq") +
+                      scale_fill_manual(values=level_cols_Herbicide) +
+                      scale_color_manual(values=c("gray40","gray80")) +
+                      coord_cartesian(ylim=ylim2*1.05) +  
+                      facet_grid(.~ Experiment, scales='free_x', space="free")+
+                      ggtitle("Bacteria: Sequencing depth")
+
+## barplot
+df <- df[order(df$col_sum, decreasing = T),]
+df <- df[order(df$Experiment),]
+df$x <- c(1:sum(df$Experiment == "Experiment 1"), 1:sum(df$Experiment == "Experiment 2"))
+
+
+
+samples <-  ggplot(df, aes(x=x, y=col_sum, fill=Herbicide, color=Herbicide))+
+                geom_bar(aes(width=1), size=0.1, stat = "identity", col="black", lty=0.5)+
+                #scale_y_continuous(trans = 'log2')+
+                scale_fill_manual(values=level_cols_Herbicide) +
+                scale_colour_manual(values = level_cols_Herbicide) +
+                xlab("samples")+
+                ylab("seq / samples")+
+                facet_grid(.~ Experiment, scales='free_x', space="free")+
+                theme_bw() +
+                theme(axis.text.x=element_blank(), axis.ticks.x=element_blank(),
+                      strip.background = element_blank(), strip.text.x = element_blank(), legend.position = "none")
+                #facet_grid(.~ Spraying, scales='free_x', space="free")
+                #ggtitle("Sequencing depth per sample")
+
+
+#combine the two plots (library cowplot)
+bac_plot <- cowplot::plot_grid(seq_nr + theme(legend.position="none"),
+                       samples + theme(legend.position="none") + labs(colour=""),
+                       #labels=c("A","B"),
+                       align = "hv",
+                       rel_heights = c(9,5),
+                       nrow=2)
+
+```
+
+```{r Figure 1 fungi, fig.height=5, fig.width=8, echo=F, warning=F, message=F}
+
+## boxplot
+df <- data.frame(col_sum=colSums(fDAT),colnames=colnames(fDAT), Spraying=fDESIGN$Spraying, 
+                 Herbicide=fDESIGN$Herbicide, group=fDESIGN$group, Experiment=fDESIGN$Experiment, Timepoint=as.factor(fDESIGN$Timepoint),
+                 group_experiment_timepoint=fDESIGN$group_experiment_timepoint)
+
+levels(df$Experiment) <- c("Experiment 1", "Experiment 2")
+levels(df$Timepoint) <- c("2w", "5w")
+
+ylim2=boxplot.stats(df$col_sum)$stats[c(1, 5)]
+
+seq_nr <- ggplot(data=df, aes(x=Spraying, y=col_sum, fill=Herbicide)) + 
+              geom_boxplot(position=position_dodge2(width=0.75, preserve="single"),outlier.colour = NA) + 
+              geom_jitter(aes(col=Timepoint, group=group_experiment_timepoint), 
+                    size=1, position=position_jitterdodge(jitter.width=0,dodge.width = 0.75))+
+              theme_bw() +
+              theme(legend.position="none") +
+              ylab("seq") +
+              scale_fill_manual(values=level_cols_Herbicide) +
+              scale_color_manual(values=c("gray40","gray80")) +
+              coord_cartesian(ylim=ylim2*1.05) +  
+              facet_grid(.~ Experiment, scales='free_x', space="free")+
+              ggtitle("Fungi: Sequencing depth")
+
+## barplot
+df <- df[order(df$col_sum, decreasing = T),]
+df <- df[order(df$Experiment),]
+df$x <- c(1:sum(df$Experiment == "Experiment 1"), 1:sum(df$Experiment == "Experiment 2"))
+
+
+samples <-  ggplot(df, aes(x=x, y=col_sum, fill=Herbicide, color=Herbicide))+
+                geom_bar(aes(width=1), size=0.1, stat = "identity", col="black", lty=0.5)+
+                #scale_y_continuous(trans = 'log2')+
+                scale_fill_manual(values=level_cols_Herbicide) +
+                scale_colour_manual(values = level_cols_Herbicide) +
+                xlab("samples")+
+                ylab("seq / sample")+
+                facet_grid(.~ Experiment, scales='free_x', space="free")+
+                theme_bw() +
+                theme(axis.text.x=element_blank(), axis.ticks.x=element_blank(),
+                      strip.background = element_blank(), strip.text.x = element_blank(), legend.position = "none")
+                #facet_grid(.~ Spraying, scales='free_x', space="free")
+                #ggtitle("Sequencing depth per sample")
+
+
+#combine the two plots (library cowplot)
+fun_plot <- plot_grid(seq_nr + theme(legend.position="none"),
+               samples + theme(legend.position="none") + labs(colour=""),
+               #labels=c("A","B"),
+               align = "hv",
+               rel_heights = c(9,5),
+               nrow=2)
+
+```
+
+```{r Figure 1 combined, fig.height=5, fig.width=8, echo=F, warning=F, message=F}
+
+#combine the two plots (library cowplot)
+fig1 <- plot_grid(bac_plot + theme(legend.position="none"),
+               fun_plot + theme(legend.position="none") + labs(colour=""),
+               #labels=c("A","B"),
+               align = "hv",
+               nrow=1)
+
+#add legend
+legend <- get_legend(seq_nr + theme(legend.position="bottom") + labs(fill="Herbicide"))
+fig1 <- plot_grid(fig1, legend, nrow=2, rel_heights=c(1, .1))
+
+#print
+# png("figures/fig1.png",6400, 4000, res = 600)
+fig1
+# dev.off()
+
+```
+
+\pagebreak
+
+## Data normalization
+
+To decide on how to normalize the data we followed the recommendation of Weiss et al. (2017, Microbiome Journal) and we inspected whether there are differences in sequencing depths between the different sample groups by using the non-parametric Kruskal-Wallis Test.
+
+### Bacteria
+
+```{r seq numbers per group bacteria, echo=F, message=F, warning=F}
+
+group <- bDESIGN$group_experiment
+sample_depth <- colSums(bDAT)
+
+bDAT_krusk <- kruskal.test(sample_depth ~ group)
+bDAT_krusk
+
+```
+
+### Fungi
+
+```{r seq numbers per group fungi, echo=F, message=F, warning=F}
+
+group <- fDESIGN$group_experiment
+sample_depth <- colSums(fDAT)
+
+fDAT_krusk <- kruskal.test(sample_depth ~ group)
+fDAT_krusk
+
+```
+
+**Conclusion:** Because there are significant differences for fungi between the sample groups, we normalized the data by rarefication for diversity comparisions (see Weiss et al. (2017), Microbiome Journal). For consistency, we rarefied for bacteria and fungi. We defined the rarefaction threshold per sample to `r b_rare` for bacteria and `r f_rare` for fungi .
+
+
+```{r DAT rare, warning=F, echo=F}
+
+# rarefication with library(vegan)
+bDAT_rare <- t(vegan::rrarefy(t(bDAT), b_rare))
+bDAT_rare <- bDAT_rare[rowSums(bDAT_rare) > 0,]  # removal of rows with 0 values
+
+fDAT_rare <- t(vegan::rrarefy(t(fDAT), f_rare))
+fDAT_rare <- fDAT_rare[rowSums(fDAT_rare) > 0,]  # removal of rows with 0 values
+
+```
+
+\pagebreak
+
+## Sample Size
+
+We discarded eight bacterial samples with too few reads per sample while we kept all fungal samples. We ended up with the following number of samples per treatment for the analysis. The samples were labeled as "Herbicide_Spraying_Experiment_Timepoint":
+
+```{r sample size rare, warning=F, echo=F}
+
+#final number of samples
+btable <- table(bDESIGN$group_experiment_timepoint)
+ftable <- table(fDESIGN$group_experiment_timepoint)
+
+#concatenate
+sample_number <- data.frame(bacteria=btable, fungi=ftable)
+if(all(sample_number$bacteria.Var1 == sample_number$fungi.Var1)){
+  sample_number <- sample_number[c("bacteria.Var1","bacteria.Freq","fungi.Freq")]
+  names(sample_number) <- c("Sample", "Bacteria", "Fungi")
+} else{"Check order"}
+
+#out
+pander::pander(sample_number, caption = "Sample profile")
+
+#library(xlsx)
+#xlsx::write.xlsx(btable, "btable.xlsx")
+#xlsx::write.xlsx(ftable, "ftable.xlsx")
+
+```
+
+```{r export RDA files, echo=F, warning=F, message=F}
+
+# Export
+
+# create directory
+dir.create("interim")
+dir.create("interim/01_Import_Normalization")
+
+## set output directory
+setwd("interim/01_Import_Normalization")
+
+#save objects needed in the following scripts
+saveRDS(bDESIGN, "bDESIGN.RDS")
+saveRDS(bDAT, "bDAT.RDS")
+saveRDS(bTAX, "bTAX.RDS")
+saveRDS(bDAT_rare, "bDAT_rare.RDS")
+saveRDS(b_rare, "b_rare.RDS")
+
+saveRDS(fDESIGN, "fDESIGN.RDS")
+saveRDS(fDAT, "fDAT.RDS")
+saveRDS(fTAX, "fTAX.RDS")
+saveRDS(fDAT_rare, "fDAT_rare.RDS")
+saveRDS(f_rare, "f_rare.RDS")
+
+saveRDS(level_cols_Herbicide, "level_cols_Herbicide.RDS")
+saveRDS(level_cols_Spraying, "level_cols_Spraying.RDS")
+saveRDS(bTAX_level_cols_phyla, "bTAX_level_cols_phyla.RDS")
+saveRDS(fTAX_level_cols_phyla, "fTAX_level_cols_phyla.RDS")
+
+```
+
+\pagebreak

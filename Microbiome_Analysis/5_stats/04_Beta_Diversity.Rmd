@@ -1,0 +1,796 @@
+---
+title: "Herbicide - 04: Beta Diversity"
+author: "Jan Waelchli"
+geometry: margin=2cm
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 3
+---
+   
+```{r setup, include=FALSE, echo=F, warning=F, message=F,}
+
+##clear the object from memory
+rm(list=ls())
+
+#knitr settings
+knitr::opts_chunk$set(echo=TRUE, fig.align="center")
+options(tinytex.verbose = TRUE)
+
+#set seed
+set.seed(100)
+
+## set source to file location
+library(rstudioapi)
+setwd(dirname(getActiveDocumentContext()$path))
+
+## load functions
+source("functions/functions.R")
+functions(path="functions/")
+
+## install (if necessary) and load libraries
+libraries()
+
+```
+
+```{r paths, echo=F, message=F, warning=F}
+
+# Import
+
+#set wd to RDS files
+setwd("interim/01_Import_Normalization")
+#Import RDS files
+bDESIGN <- readRDS("bDESIGN.RDS")
+bDAT <- readRDS("bDAT.RDS")
+bDAT_rare <- readRDS("bDAT_rare.RDS")
+b_rare <- readRDS("b_rare.RDS")
+
+fDESIGN <- readRDS("fDESIGN.RDS")
+fDAT <- readRDS("fDAT.RDS")
+fDAT_rare <- readRDS("fDAT_rare.RDS")
+f_rare <- readRDS("f_rare.RDS")
+
+
+level_cols_Herbicide <- readRDS("level_cols_Herbicide.RDS")
+level_cols_Spraying <- readRDS("level_cols_Spraying.RDS")
+
+bPHYSEQ <- readRDS("../02_Taxa_Analysis/bPHYSEQ.RDS")
+fPHYSEQ <- readRDS("../02_Taxa_Analysis/fPHYSEQ.RDS")
+
+```
+
+# Beta diversity
+
+We answered the following questions for the bacterial and fungal beta diversity:  
+
+* **Q1: Are there differences in beta diversity between the spraying applications?**
+* **Q2: Are there differences in beta diversity between the herbicide treatments?**
+
+## Method
+
+For the two questions we followed the same logic. First we used the function 'adonis()' (package vegan) to analyze the beta diversity with a PERMANOVA (permutations = 999). Then, we graphically represent the beta diversity with a CAP plot (constrained ordination).
+
+## Effect of all factors on beta diversity
+
+Before answering the single questions, we got an overview by investigating the full model to see which factors alters the beta diversity.
+
+### Bacteria
+
+```{r bac PERMANOVA all, warning=F, echo=F, eval=T}
+
+### BACTERIA
+
+#Experiment 1
+bPHYSEQ_exp1 <- prune_samples(sample_data(bPHYSEQ)$Experiment==1, bPHYSEQ)
+bDAT_exp1 <- otu_table(bPHYSEQ_exp1)
+bDESIGN_exp1 <- droplevels(bDESIGN[bDESIGN$Experiment==1,])
+bdist_exp1 <- vegdist(t(bDAT_exp1), method="bray")
+bdist_paov_exp1 <- adonis2(bdist_exp1 ~ Herbicide * Spraying * Timepoint + Plate, data=bDESIGN_exp1)
+pander(bdist_paov_exp1, caption="Bacteria PERMANOVA: Experiment 1")
+
+#Experiment 2
+bPHYSEQ_exp2 <- prune_samples(sample_data(bPHYSEQ)$Experiment==2, bPHYSEQ)
+bDAT_exp2 <- otu_table(bPHYSEQ_exp2)
+bDESIGN_exp2 <- droplevels(bDESIGN[bDESIGN$Experiment==2,])
+bdist_exp2 <- vegdist(t(bDAT_exp2), method="bray")
+bdist_paov_exp2 <- adonis2(bdist_exp2 ~ Herbicide * Spraying * Timepoint + Plate, data=bDESIGN_exp2)
+pander(bdist_paov_exp2, caption="Bacteria PERMANOVA: Experiment 2")
+
+```
+
+\pagebreak
+
+### Fungi
+
+```{r fun PERMANOVA all, warning=F, echo=F, eval=T}
+
+### FUNGI
+
+#Experiment 1
+fPHYSEQ_exp1 <- prune_samples(sample_data(fPHYSEQ)$Experiment==1, fPHYSEQ)
+fDAT_exp1 <- otu_table(fPHYSEQ_exp1)
+fDESIGN_exp1 <- droplevels(fDESIGN[fDESIGN$Experiment==1,])
+fdist_exp1 <- vegdist(t(fDAT_exp1), method="bray")
+fdist_paov_exp1 <- adonis2(fdist_exp1 ~ Herbicide * Spraying * Timepoint + Plate, data=fDESIGN_exp1)
+pander(fdist_paov_exp1, caption="Fungi PERMANOVA: Experiment 1")
+
+#Experiment 2
+fPHYSEQ_exp2 <- prune_samples(sample_data(fPHYSEQ)$Experiment==2, fPHYSEQ)
+fDAT_exp2 <- otu_table(fPHYSEQ_exp2)
+fDESIGN_exp2 <- droplevels(fDESIGN[fDESIGN$Experiment==2,])
+fdist_exp2 <- vegdist(t(fDAT_exp2), method="bray")
+fdist_paov_exp2 <- adonis2(fdist_exp2 ~ Herbicide * Spraying * Timepoint + Plate, data=fDESIGN_exp2)
+pander(fdist_paov_exp2, caption="Fungi PERMANOVA: Experiment 2")
+
+#export for paper
+
+#combine tables
+df1 <- cbind(Taxa="Bacteria", Experiment="Experiment1", Factor=rownames(bdist_paov_exp1), bdist_paov_exp1)
+df2 <- cbind(Taxa="Bacteria", Experiment="Experiment2", Factor=rownames(bdist_paov_exp2), bdist_paov_exp2)
+df3 <- cbind(Taxa="Fungi", Experiment="Experiment1", Factor=rownames(fdist_paov_exp1), fdist_paov_exp1)
+df4 <- cbind(Taxa="Fungi", Experiment="Experiment2", Factor=rownames(fdist_paov_exp2), fdist_paov_exp2)
+df_all <- rbind(df1, df2, df3, df4)
+rownames(df_all) <- NULL
+rm(df1, df2, df3, df4)
+
+#save
+#write.csv(df_all, "paper_tables/beta_diversity.csv", row.names = F)
+
+```
+
+**Conclusion:** We found a effect on the beta diversity between the two plates for fungi. Samples were randomized on the two plates. We are not interested in differences between the two plates, that's why we kept the "plate-treatment" in the following models as factor so that effects of the other factors were quantified while accounting for the plate variance. For constancy we kept plate as a factor in the model for bacteria and fungi. In bacteria, the beta diversity changed over time and between the different herbicides. Spraying on different targets did not significantly influence the beta diversity. Fungi were more constant, only the fungal microbiome shifted over time in experiment 1.
+
+\pagebreak
+
+## Technical artefacts
+
+We visualized the technical artefacts with a CAP (constrained ordination).
+
+### Figure 5.1 | CAP - Plate Effect
+
+\vspace{5mm}
+
+```{r CAP plate effect, echo=F, warning=F, message=F, eval=T, fig.height=5, fig.width=9}
+
+### BACTERIA
+
+all_CAP_bray <- phyloseq::ordinate(bPHYSEQ, method="CAP", ~ Plate, distance="bray") #CAP sign from PERMANOVA
+all_CAP_bray_var_tbl <- variability_table(all_CAP_bray) # extract variation details (custom function)
+all_CAP_bray_anova <- vegan::anova.cca(all_CAP_bray, permutations=999) #Anova
+
+
+#prune PHYSEQ for plot
+phylum.sum <- tapply(taxa_sums(bPHYSEQ), tax_table(bPHYSEQ)[, "labels"], sum, na.rm=T)
+topphyla <- names(sort(phylum.sum, T))[1:6]
+all_phy_sub <- prune_taxa((tax_table(bPHYSEQ)[, "labels"] %in% topphyla), bPHYSEQ)
+
+# plot sample scores
+score <- paste("[ ~ Plate: ",
+               format(all_CAP_bray_var_tbl["constrained", "proportion"] * 100, digits=2, nsmall=1),
+               "% of variance, P=",
+               format(all_CAP_bray_anova[1, 4], digits=2),
+               "]", sep = "")
+
+#all_phy_sub@sam_data$Timepoint <- as.character(all_phy_sub@sam_data$Timepoint)
+
+#plot
+p0 <- phyloseq::plot_ordination(all_phy_sub, all_CAP_bray, color="Plate", title = "Bacteria CAP: Plate effect", axes = c(1,2))
+p0$layers <- p0$layers[-1]
+p0 <- p0 + geom_point()
+#p0 <- p0 + geom_text(aes(label=bPHYSEQ@sam_data$Label))
+p0 <- p0 + labs(subtitle = score)
+p0 <- p0 + theme_bw()
+fig_bac <- p0
+
+
+### FUNGI
+
+all_CAP_bray <- ordinate(fPHYSEQ, method="CAP", ~ Plate, distance="bray") #CAP sign from PERMANOVA
+all_CAP_bray_var_tbl <- variability_table(all_CAP_bray) # extract variation details
+all_CAP_bray_anova <- anova.cca(all_CAP_bray, permutations=999) #Anova
+
+#prune PHYSEQ for plot
+phylum.sum <- tapply(taxa_sums(fPHYSEQ), tax_table(fPHYSEQ)[, "labels"], sum, na.rm=T)
+topphyla <- names(sort(phylum.sum, T))[1:6]
+all_phy_sub <- prune_taxa((tax_table(fPHYSEQ)[, "labels"] %in% topphyla), fPHYSEQ)
+
+# plot sample scores
+score <- paste("[ ~ Plate: ",
+               format(all_CAP_bray_var_tbl["constrained", "proportion"] * 100, digits=2, nsmall=1),
+               "% of variance, P=",
+               format(all_CAP_bray_anova[1, 4], digits=2),
+               "]", sep = "")
+
+#all_phy_sub@sam_data$Timepoint <- as.character(all_phy_sub@sam_data$Timepoint)
+
+#plot
+p0 <- phyloseq::plot_ordination(all_phy_sub, all_CAP_bray, color="Plate", title = "Fungi CAP: Plate effect", axes = c(1,2))
+p0$layers <- p0$layers[-1]
+p0 <- p0 + geom_point()
+#p0 <- p0 + geom_text(aes(label=fPHYSEQ@sam_data$Label))
+p0 <- p0 + labs(subtitle = score)
+p0 <- p0 + theme_bw()
+fig_fun <- p0
+
+### PLOT
+
+#combine the two plots (library cowplot)
+fig_5.1 <- plot_grid(fig_bac + theme(legend.position="none"),
+               fig_fun + theme(legend.position="none") + labs(colour=""),
+               #labels=c("A","B"),
+               align = "hv",
+               nrow=1)
+
+#add legend
+legend <- get_legend(fig_bac + theme(legend.position="bottom") + labs(fill="Plate"))
+fig_5.1 <- plot_grid(fig_5.1, legend, nrow=2, rel_heights=c(1, .1))
+
+#print
+#png("figures/fig5.1.png",12000, 7000, res = 600)
+fig_5.1
+#dev.off()
+
+```
+
+\pagebreak
+
+## Spraying effect
+
+**Q1: Are there differences in beta diversity between the spraying applications?**  
+We could see that there was no effect for bacteria nor for fungi. Spraying direct on soil or on weeds was not relevant for the microbial communities. That's why we do not further investigate the mode of application effect.
+
+\vspace{5mm}
+
+## Herbicide effect
+
+**Q2: Are there differences in beta diversity between the herbicide treatments?**  
+We treated samples either with water (control), glyphosate or terbuthylazine. We saw that herbicides influenced the beta diversity of bacteria (both experiments) and fungi (only experiment 2). We checked for both experiments for differences between the herbicides.
+
+### Bacteria
+
+```{r PERMANOVA herbicide hc in bac, warning=F, echo=F, eval=T}
+
+### exp1
+
+#gly
+bPHYSEQ_ctr_gly_exp1 <- prune_samples(sample_data(bPHYSEQ)$Experiment ==1 & sample_data(bPHYSEQ)$Herbicide %in% c("ctr","gly"), bPHYSEQ)
+bDAT_ctr_gly_exp1 <- otu_table(bPHYSEQ_ctr_gly_exp1)
+bdist_ctr_gly_exp1 <- vegdist(t(bDAT_ctr_gly_exp1), method="bray")
+bdist_ctr_gly_exp1_paov <- adonis2(bdist_ctr_gly_exp1 ~ Herbicide * Spraying * Timepoint + Plate, 
+                                          data=bDESIGN[bDESIGN$Experiment == 1 & bDESIGN$Herbicide %in% c("ctr","gly"),])
+pander(bdist_ctr_gly_exp1_paov[1,], caption="Bacteria: Glyphosate effect in experiment 1 (tested against control)")
+
+#tb
+bPHYSEQ_ctr_tb_exp1 <- prune_samples(sample_data(bPHYSEQ)$Experiment ==1 & sample_data(bPHYSEQ)$Herbicide %in% c("ctr","tb"), bPHYSEQ)
+bDAT_ctr_tb_exp1 <- otu_table(bPHYSEQ_ctr_tb_exp1)
+bdist_ctr_tb_exp1 <- vegdist(t(bDAT_ctr_tb_exp1), method="bray")
+bdist_ctr_tb_exp1_paov <- adonis2(bdist_ctr_tb_exp1 ~ Herbicide * Spraying * Timepoint + Plate, 
+                                          data=bDESIGN[bDESIGN$Experiment == 1 & bDESIGN$Herbicide %in% c("ctr","tb"),])
+pander(bdist_ctr_tb_exp1_paov[1,], caption="Bacteria: Terbuthylazine effect in experiment 1 (tested against control)")
+
+### exp2
+
+#gly
+bPHYSEQ_ctr_gly_exp2 <- prune_samples(sample_data(bPHYSEQ)$Experiment ==2 & sample_data(bPHYSEQ)$Herbicide %in% c("ctr","gly"), bPHYSEQ)
+bDAT_ctr_gly_exp2 <- otu_table(bPHYSEQ_ctr_gly_exp2)
+bdist_ctr_gly_exp2 <- vegdist(t(bDAT_ctr_gly_exp2), method="bray")
+bdist_ctr_gly_exp2_paov <- adonis2(bdist_ctr_gly_exp2 ~ Herbicide * Spraying * Timepoint + Plate, 
+                                          data=bDESIGN[bDESIGN$Experiment ==2 & bDESIGN$Herbicide %in% c("ctr","gly"),])
+pander(bdist_ctr_gly_exp2_paov[1,], caption="Bacteria: Glyphosate effect in experiment 2 (tested against control)")
+
+#tb
+bPHYSEQ_ctr_tb_exp2 <- prune_samples(sample_data(bPHYSEQ)$Experiment ==2 & sample_data(bPHYSEQ)$Herbicide %in% c("ctr","tb"), bPHYSEQ)
+bDAT_ctr_tb_exp2 <- otu_table(bPHYSEQ_ctr_tb_exp2)
+bdist_ctr_tb_exp2 <- vegdist(t(bDAT_ctr_tb_exp2), method="bray")
+bdist_ctr_tb_exp2_paov <- adonis2(bdist_ctr_tb_exp2 ~ Herbicide * Spraying * Timepoint + Plate, 
+                                          data=bDESIGN[bDESIGN$Experiment ==2 & bDESIGN$Herbicide %in% c("ctr","tb"),])
+pander(bdist_ctr_tb_exp2_paov[1,], caption="Bacteria: Terbuthylazine effect in experiment 2 (tested against control)")
+
+
+
+
+```
+
+\pagebreak
+
+### Fungi
+
+```{r PERMANOVA herbicide hc in exp2, warning=F, echo=F, eval=T}
+
+### exp1
+
+#gly
+fPHYSEQ_ctr_gly_exp1 <- prune_samples(sample_data(fPHYSEQ)$Experiment ==1 & sample_data(fPHYSEQ)$Herbicide %in% c("ctr","gly"), fPHYSEQ)
+fDAT_ctr_gly_exp1 <- otu_table(fPHYSEQ_ctr_gly_exp1)
+fdist_ctr_gly_exp1 <- vegdist(t(fDAT_ctr_gly_exp1), method="bray")
+fdist_ctr_gly_exp1_paov <- adonis2(fdist_ctr_gly_exp1 ~ Herbicide * Spraying * Timepoint + Plate, 
+                                          data=fDESIGN[fDESIGN$Experiment == 1 & fDESIGN$Herbicide %in% c("ctr","gly"),])
+pander(fdist_ctr_gly_exp1_paov[1,], caption="Fungi: Glyphosate effect in experiment 1 (tested against control)")
+
+#tb
+fPHYSEQ_ctr_tb_exp1 <- prune_samples(sample_data(fPHYSEQ)$Experiment ==1 & sample_data(fPHYSEQ)$Herbicide %in% c("ctr","tb"), fPHYSEQ)
+fDAT_ctr_tb_exp1 <- otu_table(fPHYSEQ_ctr_tb_exp1)
+fdist_ctr_tb_exp1 <- vegdist(t(fDAT_ctr_tb_exp1), method="bray")
+fdist_ctr_tb_exp1_paov <- adonis2(fdist_ctr_tb_exp1 ~ Herbicide * Spraying * Timepoint + Plate, 
+                                          data=fDESIGN[fDESIGN$Experiment == 1 & fDESIGN$Herbicide %in% c("ctr","tb"),])
+pander(fdist_ctr_tb_exp1_paov[1,], caption="Fungi: Terbuthylazine effect in experiment 1 (tested against control)")
+
+### exp2
+
+#gly
+fPHYSEQ_ctr_gly_exp2 <- prune_samples(sample_data(fPHYSEQ)$Experiment ==2 & sample_data(fPHYSEQ)$Herbicide %in% c("ctr","gly"), fPHYSEQ)
+fDAT_ctr_gly_exp2 <- otu_table(fPHYSEQ_ctr_gly_exp2)
+fdist_ctr_gly_exp2 <- vegdist(t(fDAT_ctr_gly_exp2), method="bray")
+fdist_ctr_gly_exp2_paov <- adonis2(fdist_ctr_gly_exp2 ~ Herbicide * Spraying * Timepoint + Plate, 
+                                          data=fDESIGN[fDESIGN$Experiment ==2 & fDESIGN$Herbicide %in% c("ctr","gly"),])
+pander(fdist_ctr_gly_exp2_paov[1,], caption="Fungi: Glyphosate effect in experiment 2 (tested against control)")
+
+#tb
+fPHYSEQ_ctr_tb_exp2 <- prune_samples(sample_data(fPHYSEQ)$Experiment ==2 & sample_data(fPHYSEQ)$Herbicide %in% c("ctr","tb"), fPHYSEQ)
+fDAT_ctr_tb_exp2 <- otu_table(fPHYSEQ_ctr_tb_exp2)
+fdist_ctr_tb_exp2 <- vegdist(t(fDAT_ctr_tb_exp2), method="bray")
+fdist_ctr_tb_exp2_paov <- adonis2(fdist_ctr_tb_exp2 ~ Herbicide * Spraying * Timepoint + Plate, 
+                                          data=fDESIGN[fDESIGN$Experiment ==2 & fDESIGN$Herbicide %in% c("ctr","tb"),])
+pander(fdist_ctr_tb_exp2_paov[1,], caption="Fungi: Terbuthylazine effect in experiment 2 (tested against control)")
+
+```
+
+\vspace{5mm}
+
+### Figure 5.2 | CAP - Herbicides
+
+\vspace{5mm}
+
+```{r function centroid lines, echo=F, warning=F, eval=T, fig.height=3, fig.width=11}
+
+#function to get centroid lines
+centroid_lines <- function(PHYSEQ, dist_matrix, group, axes=c(1,2)){
+  #get ordination values
+  lines <- as.data.frame(plot_ordination(PHYSEQ, dist_matrix, axes=axes, justDF=T))
+  colnames(lines)[1:2] <- c("Axis.1","Axis.2")
+  lines <- lines[,colnames(lines) %in% c("Axis.1","Axis.2",group)]#subset
+  #get centroids (means of each group)
+  means1 <- aggregate(lines$Axis.1, by=as.list(lines[,colnames(lines) %in% group, drop=F]), FUN=mean)
+  means2 <- aggregate(lines$Axis.2, by=as.list(lines[,colnames(lines) %in% group, drop=F]), FUN=mean)
+  #concat groups (for multiple groups)
+  lines$concact <- lines[,colnames(lines) %in% group,drop=F] %>% apply(2, as.character) %>% apply(1, paste, collapse="")
+  means1$concact <- means1[,colnames(means1) %in% group,drop=F] %>% apply(2, as.character) %>% apply(1, paste, collapse="")
+  means2$concact <- means2[,colnames(means2) %in% group,drop=F] %>% apply(2, as.character) %>% apply(1, paste, collapse="")
+  #add means to data.frame
+  lines$Axis.1.means <- NA
+  lines$Axis.2.means <- NA
+  group_values <- unique(lines$concact)
+  for (i in group_values) {
+    lines$Axis.1.means[lines$concact == i] <- means1$x[means1$concact == i]
+    lines$Axis.2.means[lines$concact == i] <- means2$x[means1$concact == i]
+  }
+  #subset df
+  lines <- lines[,colnames(lines) %in% c("Axis.1","Axis.2","Axis.1.means","Axis.2.means")]
+  #return
+  return(lines)
+}
+
+```
+
+```{r CAP herbicide all, echo=F, warning=F, eval=T, fig.height=9, fig.width=8}
+
+### BACTERIA
+
+#exp1
+CAP_bray <- ordinate(bPHYSEQ_exp1, method="CAP", ~ Herbicide, distance="bray") #CAP
+CAP_bray_var_tbl <- variability_table(CAP_bray) # extract variation details
+phylum.sum <- tapply(taxa_sums(bPHYSEQ_exp1), tax_table(bPHYSEQ_exp1)[, "labels"], sum, na.rm=T)
+topphyla <- names(sort(phylum.sum, T))[1:6]
+phy_sub <- prune_taxa((tax_table(bPHYSEQ_exp1)[, "labels"] %in% topphyla), bPHYSEQ_exp1)
+
+#variance for score
+bPHYSEQ_exp1 <- prune_samples(sample_data(bPHYSEQ)$Experiment ==1, bPHYSEQ)
+bDAT_exp1 <- otu_table(bPHYSEQ_exp1)
+bdist_exp1 <- vegdist(t(bDAT_exp1), method="bray")
+bdist_exp1_paov <- adonis2(bdist_exp1 ~ Herbicide * Spraying * Timepoint + Plate, data=bDESIGN_exp1)
+
+score <- paste0("Hc:", 
+               format(bdist_exp1_paov$R2[1] * 100, digits=2, nsmall=1),
+               "% var, P=",format(bdist_exp1_paov$`Pr(>F)`[1], digits=2))
+#plot
+phy_sub@sam_data$Timepoint <- as.factor(phy_sub@sam_data$Timepoint)
+p0 <- phyloseq::plot_ordination(phy_sub, CAP_bray, color="Herbicide", shape="Timepoint", axes=c(1,2))
+p0$layers <- p0$layers[-1]
+p0 <- p0 + geom_point(size=3)
+blines_exp1 <- centroid_lines(phy_sub, CAP_bray, "Herbicide")
+p0 <- p0 + geom_segment(aes(xend=blines_exp1$Axis.1, yend=blines_exp1$Axis.2), x = blines_exp1$Axis.1.means, y = blines_exp1$Axis.2.means, alpha=0.3)
+p0 <- p0 + scale_color_manual(values=level_cols_Herbicide)
+p0 <- p0 + scale_shape_manual(values=c(15,17))
+p0 <- p0 + labs(subtitle = score)
+p0 <- p0 + theme_bw()
+p0 <- p0 + facet_wrap(~"Experiment 1")
+fig_bac_exp1 <- p0
+
+
+#exp2
+CAP_bray <- ordinate(bPHYSEQ_exp2, method="CAP", ~ Herbicide, distance="bray") #CAP
+CAP_bray_var_tbl <- variability_table(CAP_bray) # extract variation details
+phylum.sum <- tapply(taxa_sums(bPHYSEQ_exp2), tax_table(bPHYSEQ_exp2)[, "labels"], sum, na.rm=T)
+topphyla <- names(sort(phylum.sum, T))[1:6]
+phy_sub <- prune_taxa((tax_table(bPHYSEQ_exp2)[, "labels"] %in% topphyla), bPHYSEQ_exp2)
+
+#variance for score
+bPHYSEQ_exp2 <- prune_samples(sample_data(bPHYSEQ)$Experiment ==2, bPHYSEQ)
+bDAT_exp2 <- otu_table(bPHYSEQ_exp2)
+bdist_exp2 <- vegdist(t(bDAT_exp2), method="bray")
+bdist_exp2_paov <- adonis2(bdist_exp2 ~ Herbicide * Spraying * Timepoint + Plate, data=bDESIGN_exp2)
+
+score <- paste0("Hc:", 
+               format(bdist_exp2_paov$R2[1] * 100, digits=2, nsmall=1),
+               "% var, P=",format(bdist_exp2_paov$`Pr(>F)`[1], digits=2))
+
+#plot
+phy_sub@sam_data$Timepoint <- as.factor(phy_sub@sam_data$Timepoint)
+p0 <- phyloseq::plot_ordination(phy_sub, CAP_bray, color="Herbicide", shape="Timepoint", axes=c(1,2))
+p0$layers <- p0$layers[-1]
+p0 <- p0 + geom_point(size=3)
+blines_exp2 <- centroid_lines(phy_sub, CAP_bray, "Herbicide")
+p0 <- p0 + geom_segment(aes(xend=blines_exp2$Axis.1, yend=blines_exp2$Axis.2), x = blines_exp2$Axis.1.means, y = blines_exp2$Axis.2.means, alpha=0.3)
+p0 <- p0 + scale_color_manual(values=level_cols_Herbicide)
+p0 <- p0 + scale_shape_manual(values=c(15,17))
+p0 <- p0 + labs(subtitle = score)
+p0 <- p0 + theme_bw()
+p0 <- p0 + facet_wrap(~"Experiment 2")
+fig_bac_exp2 <- p0
+
+
+### FUNGI
+
+#exp1
+CAP_bray <- ordinate(fPHYSEQ_exp1, method="CAP", ~ Herbicide + Plate, distance="bray") #CAP add Plate because stronger effect and then plot axes 2,3
+CAP_bray_var_tbl <- variability_table(CAP_bray) # extract variation details
+phylum.sum <- tapply(taxa_sums(fPHYSEQ_exp1), tax_table(fPHYSEQ_exp1)[, "labels"], sum, na.rm=T)
+topphyla <- names(sort(phylum.sum, T))[1:6]
+phy_sub <- prune_taxa((tax_table(fPHYSEQ_exp1)[, "labels"] %in% topphyla), fPHYSEQ_exp1)
+
+#variance for score
+fPHYSEQ_exp1 <- prune_samples(sample_data(fPHYSEQ)$Experiment ==1, fPHYSEQ)
+fDAT_exp1 <- otu_table(fPHYSEQ_exp1)
+fdist_exp1 <- vegdist(t(fDAT_exp1), method="bray")
+fdist_exp1_paov <- adonis2(fdist_exp1 ~ Herbicide * Spraying * Timepoint + Plate, data=fDESIGN_exp1)
+
+score <- paste0("Hc:", 
+               format(fdist_exp1_paov$R2[1] * 100, digits=2, nsmall=1),
+               "% var, P=",format(fdist_exp1_paov$`Pr(>F)`[1], digits=2))
+
+#plot
+phy_sub@sam_data$Timepoint <- as.factor(phy_sub@sam_data$Timepoint)
+p0 <- phyloseq::plot_ordination(phy_sub, CAP_bray, color="Herbicide", shape="Timepoint", axes=c(2,3))
+p0$layers <- p0$layers[-1]
+p0 <- p0 + geom_point(size=3)
+flines_exp1 <- centroid_lines(phy_sub, CAP_bray, "Herbicide", axes = c(2,3))
+p0 <- p0 + geom_segment(aes(xend=flines_exp1$Axis.1, yend=flines_exp1$Axis.2), x = flines_exp1$Axis.1.means, y = flines_exp1$Axis.2.means, alpha=0.3)
+p0 <- p0 + scale_color_manual(values=level_cols_Herbicide)
+p0 <- p0 + scale_shape_manual(values=c(15,17))
+p0 <- p0 + labs(subtitle = score)
+p0 <- p0 + theme_bw()
+p0 <- p0 + facet_wrap(~"Experiment 1")
+fig_fun_exp1 <- p0
+
+
+#exp2
+CAP_bray <- ordinate(fPHYSEQ_exp2, method="CAP", ~ Herbicide + Plate, distance="bray") #CAP
+CAP_bray_var_tbl <- variability_table(CAP_bray) # extract variation details
+phylum.sum <- tapply(taxa_sums(fPHYSEQ_exp2), tax_table(fPHYSEQ_exp2)[, "labels"], sum, na.rm=T)
+topphyla <- names(sort(phylum.sum, T))[1:6]
+phy_sub <- prune_taxa((tax_table(fPHYSEQ_exp2)[, "labels"] %in% topphyla), fPHYSEQ_exp2)
+
+#variance for score
+fPHYSEQ_exp2 <- prune_samples(sample_data(fPHYSEQ)$Experiment ==2, fPHYSEQ)
+fDAT_exp2 <- otu_table(fPHYSEQ_exp2)
+fdist_exp2 <- vegdist(t(fDAT_exp2), method="bray")
+fdist_exp2_paov <- adonis2(fdist_exp2 ~ Herbicide * Spraying * Timepoint + Plate, data=fDESIGN_exp2)
+
+score <- paste0("Hc:", 
+               format(fdist_exp2_paov$R2[1] * 100, digits=2, nsmall=1),
+               "% var, P=",format(fdist_exp2_paov$`Pr(>F)`[1], digits=2))
+
+#plot
+phy_sub@sam_data$Timepoint <- as.factor(phy_sub@sam_data$Timepoint)
+p0 <- phyloseq::plot_ordination(phy_sub, CAP_bray, color="Herbicide", shape="Timepoint", axes=c(2,3))
+p0$layers <- p0$layers[-1]
+p0 <- p0 + geom_point(size=3)
+flines_exp2 <- centroid_lines(phy_sub, CAP_bray, "Herbicide", axes = c(2,3))
+p0 <- p0 + geom_segment(aes(xend=flines_exp2$Axis.1, yend=flines_exp2$Axis.2), x = flines_exp2$Axis.1.means, y = flines_exp2$Axis.2.means, alpha=0.3)
+p0 <- p0 + scale_color_manual(values=level_cols_Herbicide)
+p0 <- p0 + scale_shape_manual(values=c(15,17))
+p0 <- p0 + labs(subtitle = score)
+p0 <- p0 + theme_bw()
+p0 <- p0 + facet_wrap(~"Experiment 2")
+fig_fun_exp2 <- p0
+
+
+#for paper
+# fig_5.2 <- plot_grid(fig_bac_exp1 + theme(legend.position="none"),
+#                fig_bac_exp2 + theme(legend.position="none") + labs(colour=""),
+#                fig_fun_exp1 + theme(legend.position="none") + labs(colour=""),
+#                fig_fun_exp2 + theme(legend.position="none") + labs(colour=""),
+#                #labels=c("A","","B",""),
+#                align = "hv",
+#                nrow=1)
+#saveRDS(fig_5.2, "paper_figs/RDS/fig5.2.RDS")
+
+#combine all
+fig_5.2 <- plot_grid(fig_bac_exp1 + theme(legend.position="none"),
+               fig_bac_exp2 + theme(legend.position="none") + labs(colour=""),
+               fig_fun_exp1 + theme(legend.position="none") + labs(colour=""),
+               fig_fun_exp2 + theme(legend.position="none") + labs(colour=""),
+               #labels=c("A","","B",""),
+               align = "hv",
+               nrow=2)
+
+
+#add legend
+legend <- get_legend(fig_bac_exp1 + theme(legend.position="bottom"))
+fig_5.2 <- plot_grid(fig_5.2, legend, nrow=2, rel_heights=c(1, .1))
+
+#print
+fig_5.2
+
+
+```
+
+```{r CAP herbicide exp1, echo=F, warning=F, eval=T, fig.height=9, fig.width=9}
+
+# #gly
+# CAP_bray <- ordinate(bPHYSEQ_ctr_gly_exp1, method="CAP", ~ Herbicide + Timepoint + Plate, distance="bray") #CAP
+# CAP_bray_var_tbl <- variability_table(CAP_bray) # extract variation details
+# phylum.sum <- tapply(taxa_sums(bPHYSEQ_ctr_gly_exp1), tax_table(bPHYSEQ_ctr_gly_exp1)[, "labels"], sum, na.rm=T)
+# topphyla <- names(sort(phylum.sum, T))[1:6]
+# phy_sub <- prune_taxa((tax_table(bPHYSEQ_ctr_gly_exp1)[, "labels"] %in% topphyla), bPHYSEQ_ctr_gly_exp1)
+# score <- paste("[ ~ Hc + Time + Plate; Hc ",
+#                format(bdist_ctr_gly_exp1_paov$R2[1] * 100, digits=2, nsmall=1),
+#                "% var, P=",format(bdist_ctr_gly_exp1_paov$`Pr(>F)`[1], digits=2),"]", sep = "")
+# #plot
+# p0 <- phyloseq::plot_ordination(phy_sub, CAP_bray, color="Herbicide", title =  "Bacteria CAP: Glyphosate effect in exp1", axes=c(1,2))
+# p0$layers <- p0$layers[-1]
+# p0 <- p0 + geom_point(size=3)
+# #p0 <- p0 + geom_text(aes(label=bPHYSEQ_ctr_gly_exp1@sam_data$Label))
+# p0 <- p0 + scale_color_manual(values=level_cols_Herbicide)
+# #p0 <- p0 + scale_shape_manual(values=c(1,16))
+# p0 <- p0 + scale_size_manual(values=level_cols_Herbicide)
+# p0 <- p0 + labs(subtitle = score)
+# p0 <- p0 + theme_bw()
+# fig_bac_ctr_gly_exp1 <- p0
+# 
+# #tb
+# CAP_bray <- ordinate(bPHYSEQ_ctr_tb_exp1, method="CAP", ~ Herbicide + Timepoint + Plate, distance="bray") #CAP
+# CAP_bray_var_tbl <- variability_table(CAP_bray) # extract variation details
+# phylum.sum <- tapply(taxa_sums(bPHYSEQ_ctr_tb_exp1), tax_table(bPHYSEQ_ctr_tb_exp1)[, "labels"], sum, na.rm=T)
+# topphyla <- names(sort(phylum.sum, T))[1:6]
+# phy_sub <- prune_taxa((tax_table(bPHYSEQ_ctr_tb_exp1)[, "labels"] %in% topphyla), bPHYSEQ_ctr_tb_exp1)
+# score <- paste("[ ~ Hc + Time + Plate; Hc ",
+#                format(bdist_ctr_tb_exp1_paov$R2[1] * 100, digits=2, nsmall=1),
+#                "% var, P=",format(bdist_ctr_tb_exp1_paov$`Pr(>F)`[1], digits=2),"]", sep = "")
+# 
+# #plot
+# p0 <- phyloseq::plot_ordination(phy_sub, CAP_bray, color="Herbicide", title =  "Bacteria CAP: Terbuthylazine effect in exp1", axes=c(1,2))
+# p0$layers <- p0$layers[-1]
+# p0 <- p0 + geom_point(size=3)
+# #p0 <- p0 + geom_text(aes(label=bPHYSEQ_ctr_tb_exp1@sam_data$Label))
+# p0 <- p0 + scale_color_manual(values=level_cols_Herbicide)
+# #p0 <- p0 + scale_shape_manual(values=c(1,16))
+# p0 <- p0 + scale_size_manual(values=level_cols_Herbicide)
+# p0 <- p0 + labs(subtitle = score)
+# p0 <- p0 + theme_bw()
+# fig_bac_ctr_tb_exp1 <- p0
+# 
+# 
+# ### FUNGI
+# 
+# #gly
+# CAP_bray <- ordinate(fPHYSEQ_ctr_gly_exp1, method="CAP", ~ Herbicide + Timepoint + Plate + Plate, distance="bray") #CAP
+# CAP_bray_var_tbl <- variability_table(CAP_bray) # extract variation details
+# phylum.sum <- tapply(taxa_sums(fPHYSEQ_ctr_gly_exp1), tax_table(fPHYSEQ_ctr_gly_exp1)[, "labels"], sum, na.rm=T)
+# topphyla <- names(sort(phylum.sum, T))[1:6]
+# phy_sub <- prune_taxa((tax_table(fPHYSEQ_ctr_gly_exp1)[, "labels"] %in% topphyla), fPHYSEQ_ctr_gly_exp1)
+# score <- paste("[ ~ Hc + Time + Plate; Hc ",
+#                format(fdist_ctr_gly_exp1_paov$R2[1] * 100, digits=2, nsmall=1),
+#                "% var, P=",format(fdist_ctr_gly_exp1_paov$`Pr(>F)`[1], digits=2),"]", sep = "")
+# #plot
+# p0 <- phyloseq::plot_ordination(phy_sub, CAP_bray, color="Herbicide", title =  "Fungi CAP: Glyphosate effect in exp1", axes=c(2,3))
+# p0$layers <- p0$layers[-1]
+# p0 <- p0 + geom_point(size=3)
+# #p0 <- p0 + geom_text(aes(label=fPHYSEQ_ctr_gly_exp1@sam_data$Label))
+# p0 <- p0 + scale_color_manual(values=level_cols_Herbicide)
+# #p0 <- p0 + scale_shape_manual(values=c(1,16))
+# p0 <- p0 + scale_size_manual(values=level_cols_Herbicide)
+# p0 <- p0 + labs(subtitle = score)
+# p0 <- p0 + theme_bw()
+# fig_fun_ctr_gly_exp1 <- p0
+# 
+# #tb
+# CAP_bray <- ordinate(fPHYSEQ_ctr_tb_exp1, method="CAP", ~ Herbicide + Timepoint + Plate + Plate, distance="bray") #CAP
+# CAP_bray_var_tbl <- variability_table(CAP_bray) # extract variation details
+# phylum.sum <- tapply(taxa_sums(fPHYSEQ_ctr_tb_exp1), tax_table(fPHYSEQ_ctr_tb_exp1)[, "labels"], sum, na.rm=T)
+# topphyla <- names(sort(phylum.sum, T))[1:6]
+# phy_sub <- prune_taxa((tax_table(fPHYSEQ_ctr_tb_exp1)[, "labels"] %in% topphyla), fPHYSEQ_ctr_tb_exp1)
+# score <- paste("[ ~ Hc + Time + Plate; Hc ",
+#                format(fdist_ctr_tb_exp1_paov$R2[1] * 100, digits=2, nsmall=1),
+#                "% var, P=",format(fdist_ctr_tb_exp1_paov$`Pr(>F)`[1], digits=2),"]", sep = "")
+# 
+# #plot
+# p0 <- phyloseq::plot_ordination(phy_sub, CAP_bray, color="Herbicide", title =  "Fungi CAP: Terbuthylazine effect in exp1", axes=c(2,3))
+# p0$layers <- p0$layers[-1]
+# p0 <- p0 + geom_point(size=3)
+# #p0 <- p0 + geom_text(aes(label=fPHYSEQ_ctr_tb_exp1@sam_data$Label))
+# p0 <- p0 + scale_color_manual(values=level_cols_Herbicide)
+# #p0 <- p0 + scale_shape_manual(values=c(1,16))
+# p0 <- p0 + scale_size_manual(values=level_cols_Herbicide)
+# p0 <- p0 + labs(subtitle = score)
+# p0 <- p0 + theme_bw()
+# fig_fun_ctr_tb_exp1 <- p0
+# 
+# 
+# ### PLOT
+# #combine the two plots (library cowplot)
+# fig_5.2.1 <- plot_grid(fig_bac_ctr_gly_exp1 + theme(legend.position="none"),
+#                fig_bac_ctr_tb_exp1 + theme(legend.position="none") + labs(colour=""),
+#                fig_fun_ctr_gly_exp1 + theme(legend.position="none") + labs(colour=""),
+#                fig_fun_ctr_tb_exp1 + theme(legend.position="none") + labs(colour=""),
+#                labels=c("A","","B",""),
+#                align = "hv",
+#                nrow=2)
+# 
+# #add legend
+# pseudo <- ggplot(bDESIGN[bDESIGN$Timepoint!=0,], aes(x=Timepoint, y=Experiment, color=Herbicide))+geom_point()+scale_color_manual(values=level_cols_Herbicide)+theme_bw()
+# legend <- get_legend(pseudo + theme(legend.position="bottom") + labs(fill="Experiment"))
+# fig_5.2.1 <- plot_grid(fig_5.2.1, legend, nrow=2, rel_heights=c(1, .1))
+# 
+# #print
+# #png("figures/fig5.2.1.png",12000, 9000, res = 600)
+# fig_5.2.1
+# #dev.off()
+
+```
+
+```{r CAP herbicide exp2, echo=F, warning=F, eval=T, fig.height=9, fig.width=9}
+
+# ## BACTERIA
+# 
+# #gly
+# CAP_bray <- ordinate(bPHYSEQ_ctr_gly_exp2, method="CAP", ~ Herbicide + Timepoint + Plate, distance="bray") #CAP
+# CAP_bray_var_tbl <- variability_table(CAP_bray) # extract variation details
+# phylum.sum <- tapply(taxa_sums(bPHYSEQ_ctr_gly_exp2), tax_table(bPHYSEQ_ctr_gly_exp2)[, "labels"], sum, na.rm=T)
+# topphyla <- names(sort(phylum.sum, T))[1:6]
+# phy_sub <- prune_taxa((tax_table(bPHYSEQ_ctr_gly_exp2)[, "labels"] %in% topphyla), bPHYSEQ_ctr_gly_exp2)
+# score <- paste("[ ~ Hc + Time + Plate; Hc ",
+#                format(bdist_ctr_gly_exp2_paov$R2[1] * 100, digits=2, nsmall=1),
+#                "% var, P=",format(bdist_ctr_gly_exp2_paov$`Pr(>F)`[1], digits=2),"]", sep = "")
+# #plot
+# p0 <- phyloseq::plot_ordination(phy_sub, CAP_bray, color="Herbicide", title =  "Bacteria CAP: Glyphosate effect in exp2", axes=c(1,2))
+# p0$layers <- p0$layers[-1]
+# p0 <- p0 + geom_point(size=3)
+# #p0 <- p0 + geom_text(aes(label=bPHYSEQ_ctr_gly_exp2@sam_data$Label))
+# p0 <- p0 + scale_color_manual(values=level_cols_Herbicide)
+# #p0 <- p0 + scale_shape_manual(values=c(1,16))
+# p0 <- p0 + scale_size_manual(values=level_cols_Herbicide)
+# p0 <- p0 + labs(subtitle = score)
+# p0 <- p0 + theme_bw()
+# fig_bac_ctr_gly_exp2 <- p0
+# 
+# #tb
+# CAP_bray <- ordinate(bPHYSEQ_ctr_tb_exp2, method="CAP", ~ Herbicide + Timepoint + Plate, distance="bray") #CAP
+# CAP_bray_var_tbl <- variability_table(CAP_bray) # extract variation details
+# phylum.sum <- tapply(taxa_sums(bPHYSEQ_ctr_tb_exp2), tax_table(bPHYSEQ_ctr_tb_exp2)[, "labels"], sum, na.rm=T)
+# topphyla <- names(sort(phylum.sum, T))[1:6]
+# phy_sub <- prune_taxa((tax_table(bPHYSEQ_ctr_tb_exp2)[, "labels"] %in% topphyla), bPHYSEQ_ctr_tb_exp2)
+# score <- paste("[ ~ Hc + Time + Plate; Hc ",
+#                format(bdist_ctr_tb_exp2_paov$R2[1] * 100, digits=2, nsmall=1),
+#                "% var, P=",format(bdist_ctr_tb_exp2_paov$`Pr(>F)`[1], digits=2),"]", sep = "")
+# 
+# #plot
+# p0 <- phyloseq::plot_ordination(phy_sub, CAP_bray, color="Herbicide", title =  "Bacteria CAP: Terbuthylazine effect in exp2", axes=c(1,2))
+# p0$layers <- p0$layers[-1]
+# p0 <- p0 + geom_point(size=3)
+# #p0 <- p0 + geom_text(aes(label=bPHYSEQ_ctr_tb_exp2@sam_data$Label))
+# p0 <- p0 + scale_color_manual(values=level_cols_Herbicide)
+# #p0 <- p0 + scale_shape_manual(values=c(1,16))
+# p0 <- p0 + scale_size_manual(values=level_cols_Herbicide)
+# p0 <- p0 + labs(subtitle = score)
+# p0 <- p0 + theme_bw()
+# fig_bac_ctr_tb_exp2 <- p0
+# 
+# 
+# 
+# 
+# ## FUNGI
+# 
+# #gly
+# CAP_bray <- ordinate(fPHYSEQ_ctr_gly_exp2, method="CAP", ~ Herbicide + Timepoint + Plate + Plate, distance="bray") #CAP
+# CAP_bray_var_tbl <- variability_table(CAP_bray) # extract variation details
+# phylum.sum <- tapply(taxa_sums(fPHYSEQ_ctr_gly_exp2), tax_table(fPHYSEQ_ctr_gly_exp2)[, "labels"], sum, na.rm=T)
+# topphyla <- names(sort(phylum.sum, T))[1:6]
+# phy_sub <- prune_taxa((tax_table(fPHYSEQ_ctr_gly_exp2)[, "labels"] %in% topphyla), fPHYSEQ_ctr_gly_exp2)
+# score <- paste("[ ~ Hc + Time + Plate; Hc ",
+#                format(fdist_ctr_gly_exp2_paov$R2[1] * 100, digits=2, nsmall=1),
+#                "% var, P=",format(fdist_ctr_gly_exp2_paov$`Pr(>F)`[1], digits=2),"]", sep = "")
+# #plot
+# p0 <- phyloseq::plot_ordination(phy_sub, CAP_bray, color="Herbicide", title =  "Fungi CAP: Glyphosate effect in exp2", axes=c(2,3))
+# p0$layers <- p0$layers[-1]
+# p0 <- p0 + geom_point(size=3)
+# #p0 <- p0 + geom_text(aes(label=fPHYSEQ_ctr_gly_exp2@sam_data$Label))
+# p0 <- p0 + scale_color_manual(values=level_cols_Herbicide)
+# #p0 <- p0 + scale_shape_manual(values=c(1,16))
+# p0 <- p0 + scale_size_manual(values=level_cols_Herbicide)
+# p0 <- p0 + labs(subtitle = score)
+# p0 <- p0 + theme_bw()
+# fig_fun_ctr_gly_exp2 <- p0
+# 
+# #tb
+# CAP_bray <- ordinate(fPHYSEQ_ctr_tb_exp2, method="CAP", ~ Herbicide + Timepoint + Plate + Plate, distance="bray") #CAP
+# CAP_bray_var_tbl <- variability_table(CAP_bray) # extract variation details
+# phylum.sum <- tapply(taxa_sums(fPHYSEQ_ctr_tb_exp2), tax_table(fPHYSEQ_ctr_tb_exp2)[, "labels"], sum, na.rm=T)
+# topphyla <- names(sort(phylum.sum, T))[1:6]
+# phy_sub <- prune_taxa((tax_table(fPHYSEQ_ctr_tb_exp2)[, "labels"] %in% topphyla), fPHYSEQ_ctr_tb_exp2)
+# score <- paste("[ ~ Hc + Time + Plate; Hc ",
+#                format(fdist_ctr_tb_exp2_paov$R2[1] * 100, digits=2, nsmall=1),
+#                "% var, P=",format(fdist_ctr_tb_exp2_paov$`Pr(>F)`[1], digits=2),"]", sep = "")
+# 
+# #plot
+# p0 <- phyloseq::plot_ordination(phy_sub, CAP_bray, color="Herbicide", title =  "Fungi CAP: Terbuthylazine effect in exp2", axes=c(2,3))
+# p0$layers <- p0$layers[-1]
+# p0 <- p0 + geom_point(size=3)
+# #p0 <- p0 + geom_text(aes(label=fPHYSEQ_ctr_tb_exp2@sam_data$Label))
+# p0 <- p0 + scale_color_manual(values=level_cols_Herbicide)
+# #p0 <- p0 + scale_shape_manual(values=c(1,16))
+# p0 <- p0 + scale_size_manual(values=level_cols_Herbicide)
+# p0 <- p0 + labs(subtitle = score)
+# p0 <- p0 + theme_bw()
+# fig_fun_ctr_tb_exp2 <- p0
+# 
+# ### PLOT
+# #combine the two plots (library cowplot)
+# fig_5.2.2 <- plot_grid(fig_bac_ctr_gly_exp2 + theme(legend.position="none"),
+#                fig_bac_ctr_tb_exp2 + theme(legend.position="none") + labs(colour=""),
+#                fig_fun_ctr_gly_exp2 + theme(legend.position="none") + labs(colour=""),
+#                fig_fun_ctr_tb_exp2 + theme(legend.position="none") + labs(colour=""),
+#                labels=c("A","","B",""),
+#                align = "hv",
+#                nrow=2)
+# 
+# #add legend
+# pseudo <- ggplot(bDESIGN[bDESIGN$Timepoint!=0,], aes(x=Timepoint, y=Experiment, color=Herbicide))+geom_point()+scale_color_manual(values=level_cols_Herbicide)+theme_bw()
+# legend <- get_legend(pseudo + theme(legend.position="bottom") + labs(fill="Experiment"))
+# fig_5.2.2 <- plot_grid(fig_5.2.2, legend, nrow=2, rel_heights=c(1, .1))
+# 
+# #print
+# #png("figures/fig5.2.2.a.png",12000, 9000, res = 600)
+# fig_5.2.2
+# #dev.off()
+
+```
+
+\vspace{5mm}
+
+**Conclusion:** Spraying glyphosate and terbuthylazine altered the microbial beta diversity of bacteria and fungi. But conduction the CAP plots showed that herbicides had a small effect which only explained up to 3% of variation between communities.
+
+\vspace{5mm}
+
+## Conclusion beta diversity
+
+Different spraying targets did not alter microbial communities. Herbicides had an effect on bacterial and fungal microbial community compositions. They could explain up to 3% of the microbiome community variation.
+
+
+```{r export RDA files, , echo=F, message=F, warning=F}
+
+# create directory
+dir.create("interim")
+dir.create("interim/04_Beta_Diversity")
+
+## set output directory
+setwd("interim/04_Beta_Diversity")
+
+#save objects needed in the following scripts as RDA
+saveRDS(bPHYSEQ, "bPHYSEQ.RDS")
+saveRDS(fPHYSEQ, "fPHYSEQ.RDS")
+
+```
+
+\pagebreak
+
