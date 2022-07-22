@@ -1,0 +1,1 @@
+Run first 01_sort_by_taxa.sh to sort all files in 2_data by bacteria or fungi. Then continue with running 02_run_ASV_cluster.sh. This will run the two R scriptscontaining a dada2 pipeline for bacteria and fungi. Results will be saved in 4_output.
