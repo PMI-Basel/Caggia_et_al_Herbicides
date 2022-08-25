@@ -13,7 +13,7 @@ libraries <- function(){
   #figures and tables
   if (!require(ggplot2)){install.packages("ggplot2")}; library(ggplot2)
   if (!require(cowplot)){install.packages("cowplot")}; library(cowplot)
-  if (!require(ggvenn)){install.packages("cowplot")}; library(ggvenn)
+  if (!require(ggvenn)){install.packages("ggvenn")}; library(ggvenn)
   if (!require(pander)){install.packages("pander")}; library(pander)
   
   #stats
