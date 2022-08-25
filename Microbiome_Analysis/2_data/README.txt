@@ -1,1 +1,1 @@
-Place your data here. The runs must be named runBE07_FLDXXXX_R1.fastq.gz and runBE07_FLDXXXX_R2.fastq.gz where XXXX must be the corresponding label (FLD number) from the design file. The file samples.txt contains all samples we used.
+Place your data here. The files must be named runBE07_FLDXXXX_R1.fastq.gz and runBE07_FLDXXXX_R2.fastq.gz where XXXX must be the corresponding label (FLD number) from the design file. The file samples.txt contains all samples we used.
