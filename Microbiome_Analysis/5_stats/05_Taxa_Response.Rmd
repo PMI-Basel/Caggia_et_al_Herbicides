@@ -262,8 +262,8 @@ rm(df1, df2)
 
 #get up and down-regulated ASVs
 df$cols <- "NS"
-df$cols[df$FDR < 0.05 & df$logFC > 0] <- "higher in weeds"
-df$cols[df$FDR < 0.05 & df$logFC < 0] <- "higher in soil"
+df$cols[df$FDR < 0.05 & df$logFC > 0] <- "higher in Weed"
+df$cols[df$FDR < 0.05 & df$logFC < 0] <- "higher in Soil"
 
 #sort to plot sign at the end
 df <- df[order(df$FDR, decreasing = T),]
@@ -293,8 +293,8 @@ labels <- c(paste0("exp 1\ncRA: ", round(bCRA_higher_exp1, 2), "%"),
             paste0("exp 2\ncRA: ", round(bCRA_higher_exp2, 2), "%"))
 names(list_venn) <- labels
 #plot
-bvenn_h <- ggvenn(list_venn, fill_color = c(col_weeds_up, col_weeds_up), stroke_size = 0.5, set_name_size = 4, show_percentage = F) +
-  facet_wrap(~"higher in weeds")+ #to set title
+bvenn_h <- ggvenn(list_venn, fill_color = c(col_weeds_up, col_weeds_up), stroke_size = 0.5, set_name_size = 2.5, show_percentage = F) +
+  facet_wrap(~"higher in Weed")+ #to set title
   theme_bw()+ #to get grey title box
   theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),
         axis.title.y=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank(),
@@ -316,8 +316,8 @@ labels <- c(paste0("exp 1\ncRA: ", round(bCRA_lower_exp1, 2), "%"),
             paste0("exp 2\ncRA: ", round(bCRA_lower_exp2, 2), "%"))
 names(list_venn) <- labels
 #plot
-bvenn_l <- ggvenn(list_venn, fill_color = c(col_soil_up, col_soil_up), stroke_size = 0.5, set_name_size = 4, show_percentage = F) +
-  facet_wrap(~"higher in soil")+ #to set title
+bvenn_l <- ggvenn(list_venn, fill_color = c(col_soil_up, col_soil_up), stroke_size = 0.5, set_name_size = 2.5, show_percentage = F) +
+  facet_wrap(~"higher in Soil")+ #to set title
   theme_bw()+ #to get grey title box
   theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),
         axis.title.y=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank(),
@@ -326,10 +326,12 @@ bvenn_l <- ggvenn(list_venn, fill_color = c(col_soil_up, col_soil_up), stroke_si
 list_venn2 <- list_venn
 
 #combine plots
-fig6.1.2 <- plot_grid(bvenn_h + theme(legend.position="none", plot.margin = unit(c(0.2, 0.2, 0.2, 0.2), "cm")),
-                 bvenn_l+ theme(legend.position="none", plot.margin = unit(c(0.2, 0.2, 0.2, 0.2), "cm")) + labs(colour=""),
-                 #labels=c("A","B"),
+fig6.1.2 <- plot_grid(
+                 #NULL,
+                 bvenn_h + theme(legend.position="none", plot.margin = unit(c(0, 0.1, 0, 0.1), "cm")),
+                 bvenn_l+ theme(legend.position="none", plot.margin = unit(c(0, 0.2, 0, 0.1), "cm")) + labs(colour=""),
                  align = "hv",
+                 #rel_widths = c(0.2,1,1),
                  nrow=1)
 
 fig6.1 <- plot_grid(fig6.1.1 + theme(legend.position="none"),
@@ -411,8 +413,8 @@ rm(df1, df2)
 
 #get up and down-regulated ASVs
 df$cols <- "NS"
-df$cols[df$FDR < 0.05 & df$logFC > 0] <- "higher in weeds"
-df$cols[df$FDR < 0.05 & df$logFC < 0] <- "higher in soil"
+df$cols[df$FDR < 0.05 & df$logFC > 0] <- "higher in Weed"
+df$cols[df$FDR < 0.05 & df$logFC < 0] <- "higher in Soil"
 
 #sort to plot sign at the end
 df <- df[order(df$FDR, decreasing = T),]
@@ -442,13 +444,12 @@ labels <- c(paste0("exp 1\ncRA: ", round(fCRA_higher_exp1, 2), "%"),
             paste0("exp 2\ncRA: ", round(fCRA_higher_exp2, 2), "%"))
 names(list_venn) <- labels
 #plot
-fvenn_h <- ggvenn(list_venn, fill_color = c(col_weeds_up, col_weeds_up), stroke_size = 0.5, set_name_size = 4, show_percentage = F) +
-  facet_wrap(~"higher in weeds")+ #to set title
+fvenn_h <- ggvenn(list_venn, fill_color = c(col_weeds_up, col_weeds_up), stroke_size = 0.5, set_name_size = 2.5, show_percentage = F) +
+  facet_wrap(~"higher in Weed")+ #to set title
   theme_bw()+ #to get grey title box
   theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),
         axis.title.y=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank(),
         line = element_blank()) #to remove axes and axes lines
-  
 
 #lower in ctr
 #sensitive fungi
@@ -463,18 +464,20 @@ labels <- c(paste0("exp 1\ncRA: ", round(fCRA_lower_exp1, 2), "%"),
             paste0("exp 2\ncRA: ", round(fCRA_lower_exp2, 2), "%"))
 names(list_venn) <- labels
 #plot
-fvenn_l <- ggvenn(list_venn, fill_color = c(col_soil_up, col_soil_up), stroke_size = 0.5, set_name_size = 4, show_percentage = F) +
-  facet_wrap(~"higher in soil")+ #to set title
+fvenn_l <- ggvenn(list_venn, fill_color = c(col_soil_up, col_soil_up), stroke_size = 0.5, set_name_size = 2.5, show_percentage = F) +
+  facet_wrap(~"higher in Soil")+ #to set title
   theme_bw()+ #to get grey title box
   theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),
         axis.title.y=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank(),
         line = element_blank()) #to remove axes and axes lines
 
 #combine plots
-fig6.2.2 <- plot_grid(fvenn_h + theme(legend.position="none", plot.margin = unit(c(0.2, 0.2, 0.2, 0.2), "cm")),
-                 fvenn_l+ theme(legend.position="none", plot.margin = unit(c(0.2, 0.2, 0.2, 0.2), "cm")) + labs(colour=""),
-                 #labels=c("A","B"),
+fig6.2.2 <- plot_grid(
+                 #NULL,
+                 fvenn_h + theme(legend.position="none", plot.margin = unit(c(0, 0.1, 0, 0.1), "cm")),
+                 fvenn_l+ theme(legend.position="none", plot.margin = unit(c(0, 0.2, 0, 0.1), "cm")) + labs(colour=""),
                  align = "hv",
+                 #rel_widths = c(0.2,1,1),
                  nrow=1)
 
 fig6.2 <- plot_grid(fig6.2.1 + theme(legend.position="none"),
@@ -792,14 +795,14 @@ bCRA_higher_tb_exp2 <- cRA_Spraying(bDESIGN, bDAT_rare, c("ctr","tb"), c(2,5), 2
 
 #labels
 list_venn <- c(list_venn_gly, list_venn_tb)
-labels <- c(paste0("exp 1\ncRA: ", round(bCRA_higher_gly_exp1, 2), "%"), 
-            paste0("exp 2\ncRA: ", round(bCRA_higher_gly_exp2, 2), "%"),
-            paste0("exp 1\ncRA: ", round(bCRA_higher_tb_exp1, 2), "%"), 
-            paste0("exp 2\ncRA: ", round(bCRA_higher_tb_exp2, 2), "%"))
+labels <- c(paste0("exp 1\ncRA:", round(bCRA_higher_gly_exp1, 2), "%"), 
+            paste0("exp 2\ncRA:", round(bCRA_higher_gly_exp2, 2), "%"),
+            paste0("exp 1\ncRA:", round(bCRA_higher_tb_exp1, 2), "%"), 
+            paste0("exp 2\ncRA:", round(bCRA_higher_tb_exp2, 2), "%"))
 names(list_venn) <- labels
 
 #plot
-bvenn_h <- ggvenn(list_venn, fill_color = c(col_gly_up, col_gly_up, col_tb_up, col_tb_up), stroke_size = 0.5, set_name_size = 2, show_percentage = F) +
+bvenn_h <- ggvenn(list_venn, fill_color = c(col_gly_up, col_gly_up, col_tb_up, col_tb_up), stroke_size = 0.5, set_name_size = 1.5, show_percentage = F) +
   facet_wrap(~"higher in ctr")+ #to set title
   theme_bw()+ #to get grey title box
   theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),
@@ -825,14 +828,14 @@ bCRA_lower_tb_exp2 <- cRA_Spraying(bDESIGN, bDAT_rare, c("ctr","tb"), c(2,5), 2,
 
 #labels
 list_venn <- c(list_venn_gly, list_venn_tb)
-labels <- c(paste0("exp 1\ncRA: ", round(bCRA_lower_gly_exp1, 2), "%"), 
-            paste0("exp 2\ncRA: ", round(bCRA_lower_gly_exp2, 2), "%"),
-            paste0("exp 1\ncRA: ", round(bCRA_lower_tb_exp1, 2), "%"), 
-            paste0("exp 2\ncRA: ", round(bCRA_lower_tb_exp2, 2), "%"))
+labels <- c(paste0("exp 1\ncRA:", round(bCRA_lower_gly_exp1, 2), "%"), 
+            paste0("exp 2\ncRA:", round(bCRA_lower_gly_exp2, 2), "%"),
+            paste0("exp 1\ncRA:", round(bCRA_lower_tb_exp1, 2), "%"), 
+            paste0("exp 2\ncRA:", round(bCRA_lower_tb_exp2, 2), "%"))
 names(list_venn) <- labels
 
 #plot
-bvenn_l <- ggvenn(list_venn, fill_color = c(col_gly_up, col_gly_up, col_tb_up, col_tb_up), stroke_size = 0.5, set_name_size = 2, show_percentage = F) +
+bvenn_l <- ggvenn(list_venn, fill_color = c(col_gly_up, col_gly_up, col_tb_up, col_tb_up), stroke_size = 0.5, set_name_size = 1.5, show_percentage = F) +
   facet_wrap(~"higher in hc")+ #to set title
   theme_bw()+ #to get grey title box
   theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),
@@ -842,10 +845,12 @@ bvenn_l <- ggvenn(list_venn, fill_color = c(col_gly_up, col_gly_up, col_tb_up, c
 
 
 #combine plots
-fig7.1.2 <- plot_grid(bvenn_h + theme(legend.position="none", plot.margin = unit(c(0.2, 0.2, 0.2, 0.2), "cm")),
-                 bvenn_l+ theme(legend.position="none", plot.margin = unit(c(0.2, 0.2, 0.2, 0.2), "cm")) + labs(colour=""),
-                 #labels=c("A","B"),
+fig7.1.2 <- plot_grid(
+                 #NULL,
+                 bvenn_h + theme(legend.position="none", plot.margin = unit(c(0, 0.1, 0, 0.1), "cm")),
+                 bvenn_l+ theme(legend.position="none", plot.margin = unit(c(0, 0.2, 0, 0.1), "cm")) + labs(colour=""),
                  align = "hv",
+                 #rel_widths = c(0.2,1,1),
                  nrow=1)
 
 fig7.1 <- plot_grid(fig7.1.1 + theme(legend.position="none"),
@@ -1052,14 +1057,14 @@ fCRA_higher_tb_exp2 <- cRA_Spraying(fDESIGN, fDAT_rare, c("ctr","tb"), c(2,5), 2
 
 #labels
 list_venn <- c(list_venn_gly, list_venn_tb)
-labels <- c(paste0("exp 1\ncRA: ", round(fCRA_higher_gly_exp1, 2), "%"), 
-            paste0("exp 2\ncRA: ", round(fCRA_higher_gly_exp2, 2), "%"),
-            paste0("exp 1\ncRA: ", round(fCRA_higher_tb_exp1, 2), "%"), 
-            paste0("exp 2\ncRA: ", round(fCRA_higher_tb_exp2, 2), "%"))
+labels <- c(paste0("exp 1\ncRA:", round(fCRA_higher_gly_exp1, 2), "%"), 
+            paste0("exp 2\ncRA:", round(fCRA_higher_gly_exp2, 2), "%"),
+            paste0("exp 1\ncRA:", round(fCRA_higher_tb_exp1, 2), "%"), 
+            paste0("exp 2\ncRA:", round(fCRA_higher_tb_exp2, 2), "%"))
 names(list_venn) <- labels
 
 #plot
-fvenn_h <- ggvenn(list_venn, fill_color = c(col_gly_up, col_gly_up, col_tb_up, col_tb_up), stroke_size = 0.5, set_name_size = 2, show_percentage = F) +
+fvenn_h <- ggvenn(list_venn, fill_color = c(col_gly_up, col_gly_up, col_tb_up, col_tb_up), stroke_size = 0.5, set_name_size = 1.5, show_percentage = F) +
   facet_wrap(~"higher in ctr")+ #to set title
   theme_bw()+ #to get grey title box
   theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),
@@ -1085,14 +1090,14 @@ fCRA_lower_tb_exp2 <- cRA_Spraying(fDESIGN, fDAT_rare, c("ctr","tb"), c(2,5), 2,
 
 #labels
 list_venn <- c(list_venn_gly, list_venn_tb)
-labels <- c(paste0("exp 1\ncRA: ", round(fCRA_lower_gly_exp1, 2), "%"), 
-            paste0("exp 2\ncRA: ", round(fCRA_lower_gly_exp2, 2), "%"),
-            paste0("exp 1\ncRA: ", round(fCRA_lower_tb_exp1, 2), "%"), 
-            paste0("exp 2\ncRA: ", round(fCRA_lower_tb_exp2, 2), "%"))
+labels <- c(paste0("exp 1\ncRA:", round(fCRA_lower_gly_exp1, 2), "%"), 
+            paste0("exp 2\ncRA:", round(fCRA_lower_gly_exp2, 2), "%"),
+            paste0("exp 1\ncRA:", round(fCRA_lower_tb_exp1, 2), "%"), 
+            paste0("exp 2\ncRA:", round(fCRA_lower_tb_exp2, 2), "%"))
 names(list_venn) <- labels
 
 #plot
-fvenn_l <- ggvenn(list_venn, fill_color = c(col_gly_up, col_gly_up, col_tb_up, col_tb_up), stroke_size = 0.5, set_name_size = 2, show_percentage = F) +
+fvenn_l <- ggvenn(list_venn, fill_color = c(col_gly_up, col_gly_up, col_tb_up, col_tb_up), stroke_size = 0.5, set_name_size = 1.5, show_percentage = F) +
   facet_wrap(~"higher in hc")+ #to set title
   theme_bw()+ #to get grey title box
   theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),
@@ -1102,9 +1107,11 @@ fvenn_l <- ggvenn(list_venn, fill_color = c(col_gly_up, col_gly_up, col_tb_up, c
 
 
 #combine plots
-fig7.2.2 <- plot_grid(fvenn_h + theme(legend.position="none", plot.margin = unit(c(0.2, 0.2, 0.2, 0.2), "cm")),
-                 fvenn_l+ theme(legend.position="none", plot.margin = unit(c(0.2, 0.2, 0.2, 0.2), "cm")) + labs(colour=""),
-                 #labels=c("A","B"),
+fig7.2.2 <- plot_grid(
+                 #NULL,
+                 fvenn_h + theme(legend.position="none", plot.margin = unit(c(0, 0.1, 0, 0.1), "cm")),
+                 fvenn_l+ theme(legend.position="none", plot.margin = unit(c(0, 0.2, 0, 0.1), "cm")) + labs(colour=""),
+                 #rel_widths = c(0.2,1,1),
                  align = "hv",
                  nrow=1)
 

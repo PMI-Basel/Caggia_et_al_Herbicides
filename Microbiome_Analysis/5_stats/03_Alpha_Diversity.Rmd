@@ -413,7 +413,7 @@ pander(alpha_table_Spraying, caption = "Fungi: Spraying effect in experiment 2")
 
 #data frame for letters
 letters <- data.frame(label=c(rep("a",4)),
-                      Spraying=rep(c("weeds", "soil"), 2),
+                      Spraying=rep(c("Weed", "Soil"), 2),
                       Experiment=rep(c("Experiment 1","Experiment 2"),each=2),
                       x=c(rep(c(1:2),2)),
                       y=c(800,800,800,800))
@@ -421,6 +421,10 @@ letters <- data.frame(label=c(rep("a",4)),
 alpha_diversity_bDAT_summary$Timepoint <- as.factor(alpha_diversity_bDAT_summary$Timepoint)
 levels(alpha_diversity_bDAT_summary$Experiment) <- c("Experiment 1", "Experiment 2")
 
+#rename and reorder Spraying factors
+alpha_diversity_bDAT_summary$Spraying <- factor(alpha_diversity_bDAT_summary$Spraying, levels = c("weeds", "soil"))
+levels(alpha_diversity_bDAT_summary$Spraying) <- c("Weed", "Soil")
+names(level_cols_Spraying)<- c("Weed", "Soil")
 
 #plot
 bac_plot <- ggplot(alpha_diversity_bDAT_summary, aes(y=asv_diversity, x=Spraying, fill=Spraying)) +
@@ -435,15 +439,15 @@ bac_plot <- ggplot(alpha_diversity_bDAT_summary, aes(y=asv_diversity, x=Spraying
               facet_grid(.~ Experiment) +
               labs(title = "Bacteria: Alpha Diversity", subtitle = "Alpha Diversity ~ Herbicide * Spraying * Timepoint + Plate")+
               #labs(subtitle = "Alpha Diversity ~ Herbicide * Spraying * Timepoint + Plate")+
-              theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), plot.subtitle=element_text(size=10))+
+              theme(axis.text.x = element_text(angle = 0, vjust = 0.5, hjust=0.5), plot.subtitle=element_text(size=10))+
               geom_text(data = letters, aes(x = x, y = y, label = label, Spraying=Spraying),size=5, col="dimgrey")
 
 
 ### FUNGI
 
 #data frame for letters
-letters <- data.frame(label=c("a", "b", "b", "a"),
-                      Spraying=rep(c("weeds", "soil"), 2),
+letters <- data.frame(label=c("b", "a", "a", "b"),
+                      Spraying=rep(c("Weed", "Soil"), 2),
                       Experiment=rep(c("Experiment 1","Experiment 2"),each=2),
                       x=c(rep(c(1:2),2)),
                       y=c(58,58,58,58))
@@ -451,6 +455,10 @@ letters <- data.frame(label=c("a", "b", "b", "a"),
 alpha_diversity_fDAT_summary$Timepoint <- as.factor(alpha_diversity_fDAT_summary$Timepoint)
 levels(alpha_diversity_fDAT_summary$Experiment) <- c("Experiment 1", "Experiment 2")
 
+#rename and reorder Spraying factors
+alpha_diversity_fDAT_summary$Spraying <- factor(alpha_diversity_fDAT_summary$Spraying, levels = c("weeds", "soil"))
+levels(alpha_diversity_fDAT_summary$Spraying) <- c("Weed", "Soil")
+names(level_cols_Spraying)<- c("Weed", "Soil")
 
 #plot
 fun_plot <- ggplot(alpha_diversity_fDAT_summary, aes(y=asv_diversity, x=Spraying, fill=Spraying)) +
@@ -465,7 +473,7 @@ fun_plot <- ggplot(alpha_diversity_fDAT_summary, aes(y=asv_diversity, x=Spraying
               facet_grid(.~ Experiment) +
               labs(title = "Fungi: Alpha Diversity", subtitle = "Alpha Diversity ~ Herbicide * Spraying * Timepoint + Plate")+
               #labs(subtitle = "Alpha Diversity ~ Herbicide * Spraying * Timepoint + Plate")+
-              theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), plot.subtitle=element_text(size=10))+
+              theme(axis.text.x = element_text(angle = 0, vjust = 0.5, hjust=0.5), plot.subtitle=element_text(size=10))+
               geom_text(data = letters, aes(x = x, y = y, label = label, Spraying=Spraying),size=5, col="dimgrey")
 
 
