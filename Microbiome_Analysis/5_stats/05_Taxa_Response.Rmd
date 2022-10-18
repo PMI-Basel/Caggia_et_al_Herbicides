@@ -53,7 +53,7 @@ fTAX <- readRDS("fTAX.RDS")
 f_rare <- readRDS("f_rare.RDS")
 
 level_cols_Herbicide <- readRDS("level_cols_Herbicide.RDS")
-level_cols_Spraying <- readRDS("level_cols_Spraying.RDS")
+level_cols_Application <- readRDS("level_cols_Application.RDS")
 
 bPHYSEQ <- readRDS("../02_Taxa_Analysis/bPHYSEQ.RDS")
 fPHYSEQ <- readRDS("../02_Taxa_Analysis/fPHYSEQ.RDS")
@@ -64,46 +64,46 @@ fPHYSEQ <- readRDS("../02_Taxa_Analysis/fPHYSEQ.RDS")
 
 Did a core of microbial taxa respond to herbicides? We searched sensitive ASVs – ASVs being differential abundant between two treatments. We followed the same structure as before and answered the 2 questions:
 
-* **Q1: Are there sensitive ASVs between the spraying applications?**
+* **Q1: Are there sensitive ASVs between the herbicide applications?**
 * **Q2: Are there sensitive ASVs between the herbicide treatments?**
 
 ## Method
 
 To answer the questions we used the package edgeR (Robinson et al., 2010). We fitted a negative binomial generalized log-linear model to the number of reads for each ASV, conducted a likelihood ratio test for the given coefficient contrasts and controlled the family-wise error rate with a Bonferroni-Holms correction.
 
-```{r function herbicide timepoint, warning=F, echo=F}
+```{r function herbicide time, warning=F, echo=F}
 
-get_Herbicide_Timepoint_Experiment <- function(DESIGN, DAT, TAX, Herbicide, Timepoint, Experiment=c(1,2)){
+get_Herbicide_Time_Experiment <- function(DESIGN, DAT, TAX, Herbicide, Time, Experiment=c(1,2)){
   
   #DESIGN
   #subsetting to compartment samples
-  DESIGN_Herbicide_Timepoint_Experiment <- DESIGN [DESIGN$Timepoint %in% Timepoint & DESIGN$Herbicide %in% Herbicide & DESIGN$Experiment %in% Experiment,]
-  DESIGN_Herbicide_Timepoint_Experiment <- droplevels(DESIGN_Herbicide_Timepoint_Experiment)
+  DESIGN_Herbicide_Time_Experiment <- DESIGN [DESIGN$Time %in% Time & DESIGN$Herbicide %in% Herbicide & DESIGN$Experiment %in% Experiment,]
+  DESIGN_Herbicide_Time_Experiment <- droplevels(DESIGN_Herbicide_Time_Experiment)
   
   #ASV table
-  DAT_Herbicide_Timepoint_Experiment <- DAT[,DESIGN_Herbicide_Timepoint_Experiment$Label]
+  DAT_Herbicide_Time_Experiment <- DAT[,DESIGN_Herbicide_Time_Experiment$Label]
   
   #taxa table
-  TAX_Herbicide_Timepoint_Experiment <- TAX[rownames(TAX) %in% rownames(DAT_Herbicide_Timepoint_Experiment),]
+  TAX_Herbicide_Time_Experiment <- TAX[rownames(TAX) %in% rownames(DAT_Herbicide_Time_Experiment),]
   
-  return(list(DESIGN_Herbicide_Timepoint_Experiment, DAT_Herbicide_Timepoint_Experiment, TAX_Herbicide_Timepoint_Experiment))
+  return(list(DESIGN_Herbicide_Time_Experiment, DAT_Herbicide_Time_Experiment, TAX_Herbicide_Time_Experiment))
 }
 
 ```
 
 \pagebreak
 
-## Spraying effect
+## Application effect
 
-**Q1: Are there sensitive ASVs between the spraying applications?**  
-The herbicide was sprayed directly on soil or on weeds. We checked for different abundant ASVs after spraying herbicide.
+**Q1: Are there sensitive ASVs between the herbicide applications?**  
+The herbicide was applied directly on soil or on weeds. We checked for different abundant ASVs after application herbicide.
 
-```{r function sens Spraying, warning=F, echo=F}
+```{r function sens Application, warning=F, echo=F}
 
-sensitive_to_spraying <- function(DESIGN, DAT, TAX, Herbicide, Timepoint, Experiment, threshold.filter=7, species="bacteria"){
+sensitive_to_application <- function(DESIGN, DAT, TAX, Herbicide, Time, Experiment, threshold.filter=7, species="bacteria"){
   
   #subset datasets
-  temp <-   get_Herbicide_Timepoint_Experiment(DESIGN, DAT, TAX, Herbicide, Timepoint, Experiment)
+  temp <-   get_Herbicide_Time_Experiment(DESIGN, DAT, TAX, Herbicide, Time, Experiment)
   DES_sub <- temp[[1]]
   DAT_sub <- temp[[2]]
   TAX_sub <- temp[[3]]
@@ -111,13 +111,13 @@ sensitive_to_spraying <- function(DESIGN, DAT, TAX, Herbicide, Timepoint, Experi
 
   ### edgeR statistics
   #create EDGER object, no TMM done
-  EDGER <- edgeR.object.TMM(dat=DAT_sub, threshold.filter=threshold.filter, groups=DES_sub$Spraying, tax=TAX_sub) #custom function
+  EDGER <- edgeR.object.TMM(dat=DAT_sub, threshold.filter=threshold.filter, groups=DES_sub$Application, tax=TAX_sub) #custom function
   ## fit model, estimate dispersion (on edgeR object) using
   # custom function fit.model.edgeR() - source("functions/fun_norm_edgeR_obj.R") 
-  EDGER_fit <- fit.model.edgeR(EDGER, DES_sub$Spraying)
+  EDGER_fit <- fit.model.edgeR(EDGER, DES_sub$Application)
 
   #glmLRT - weeds vs soil
-  contrasts <- makeContrasts(weeds - soil, levels=DES_sub$Spraying) 
+  contrasts <- makeContrasts(weeds - soil, levels=DES_sub$Application) 
   EDGER_fit_lrt <- glmLRT(EDGER_fit, contrast=contrasts)
   EDGER_fit_lrt_topTags <- topTags(EDGER_fit_lrt, n=Inf, p.value=1)  # all_exp1 stat tests
   EDGER_fit_lrt_table <- topTags(EDGER_fit_lrt, n=nrow(EDGER_fit$counts), adjust.method="BH", sort.by="PValue", p.value=0.05)
@@ -135,19 +135,22 @@ sensitive_to_spraying <- function(DESIGN, DAT, TAX, Herbicide, Timepoint, Experi
   if(species=="bacteria"){try(colnames(changed)[10] <- "logFC", silent = T)}
   if(species=="fungi"){try(colnames(changed)[11] <- "logFC", silent = T)}
   
+  try(changed$logFC <- round(changed$logFC, 3))
+  colnames(changed)[colnames(changed)=="logFC"] <- "logFC weeds:soil"
+  
   return(list(EDGER_summary, changed, EDGER_fit_lrt_table_ASVs, EDGER_fit_lrt_topTags, lrt_ASVs, EDGER_fit_lrt_table))
 
 }
 
 ```
 
-```{r function cRA Spraying, warning=F, echo=F}
+```{r function cRA Application, warning=F, echo=F}
 
-cRA_Spraying <- function(DESIGN, DAT_rare, Herbicide, Timepoint, Experiment, changed){
+cRA_Application <- function(DESIGN, DAT_rare, Herbicide, Time, Experiment, changed){
   
   ##samples
-  samples_weeds <- DESIGN$Label[which(DESIGN$Herbicide %in% Herbicide & DESIGN$Timepoint %in% Timepoint & DESIGN$Experiment %in% Experiment) &  DESIGN$Spraying %in% "weeds"]
-  samples_soil <- DESIGN$Label[which(DESIGN$Herbicide %in% Herbicide & DESIGN$Timepoint %in% Timepoint & DESIGN$Experiment %in% Experiment) &  DESIGN$Spraying %in% "soil"]
+  samples_weeds <- DESIGN$Label[which(DESIGN$Herbicide %in% Herbicide & DESIGN$Time %in% Time & DESIGN$Experiment %in% Experiment) &  DESIGN$Application %in% "weeds"]
+  samples_soil <- DESIGN$Label[which(DESIGN$Herbicide %in% Herbicide & DESIGN$Time %in% Time & DESIGN$Experiment %in% Experiment) &  DESIGN$Application %in% "soil"]
   
   #subsetting and normalization
   DAT_rare_weeds <- DAT_rare[, samples_weeds ]
@@ -186,9 +189,11 @@ cRA_Spraying <- function(DESIGN, DAT_rare, Herbicide, Timepoint, Experiment, cha
   DAT_rare_MEANs <- DAT_rare_MEANs[order(DAT_rare_MEANs$rank),] #sort by ASV rank
 
   #add abundance to changed-data
-  changed$rAbu <- DAT_rare_MEANs[rownames(DAT_rare_MEANs) %in% changed$ASV_ID, 1]#add abu
-  changed <- changed[order(changed$rAbu, decreasing = T),] #sort by abu
-  try(changed$rAbu <- paste0(round(changed$rAbu,2), "%"), silent = T)
+  changed$rAbu_weeds <- DAT_rare_MEANs[rownames(DAT_rare_MEANs) %in% changed$ASV_ID, colnames(DAT_rare_MEANs)=="weeds"]
+  changed$rAbu_soil <- DAT_rare_MEANs[rownames(DAT_rare_MEANs) %in% changed$ASV_ID, colnames(DAT_rare_MEANs)=="soil"]
+  changed <- changed[order(changed$rAbu_weeds, decreasing = T),] #sort by abu
+  try(changed$rAbu_weeds <- paste0(round(changed$rAbu_weeds,3), "%"), silent = T)
+  try(changed$rAbu_soil <- paste0(round(changed$rAbu_soil,3), "%"), silent = T)
 
   return(list(cRA_weeds, cRA_soil, changed))
 
@@ -198,11 +203,11 @@ cRA_Spraying <- function(DESIGN, DAT_rare, Herbicide, Timepoint, Experiment, cha
 
 ### Bacteria
 
-```{r bac spraying, warning=F, echo=F}
+```{r bac application, warning=F, echo=F}
 
 #exp1
 
-temp <-   sensitive_to_spraying(bDESIGN, bDAT, bTAX, c("ctr","gly","tb"), c(2,5), 1, species = "bacteria")
+temp <-   sensitive_to_application(bDESIGN, bDAT, bTAX, c("ctr","gly","tb"), c(2,5), 1, species = "bacteria")
 bEDGER_summary_exp1 <- temp[[1]]
 bchanged_exp1 <- temp[[2]]
 bEDGER_fit_lrt_table_ASVs_exp1 <- temp[[3]]
@@ -210,17 +215,21 @@ bEDGER_fit_lrt_topTags_exp1 <- temp[[4]]
 lrt_bASVs_exp1 <- temp[[5]]
 bEDGER_fit_lrt_table_exp1 <- temp[[6]]
 
-temp <- cRA_Spraying(bDESIGN, bDAT_rare, c("ctr","gly","tb"), c(2,5), 1, bchanged_exp1)
+temp <- cRA_Application(bDESIGN, bDAT_rare, c("ctr","gly","tb"), c(2,5), 1, bchanged_exp1)
 bCRA_exp1 <- temp[[1]]
 bchanged_exp1 <- temp[[3]]
 
-pander(bEDGER_summary_exp1, justify='left', caption = "Bacteria: Spraying effect in experiment 1") 
-print(paste0(round(bCRA_exp1, 2), "%", " of the bacterial abundance changed between the different spraying targets."))
-pander(bchanged_exp1[1:min(10, nrow(bchanged_exp1)), c(2,3,10,12)], caption="The top abundant ASVs")
+pander(bEDGER_summary_exp1[,c(3,2,1)], justify='left', caption = "Bacteria: Application effect in experiment 1") 
+print(paste0(round(bCRA_exp1, 2), "%", " of the bacterial abundance changed between the different application targets."))
+bchanged_exp1_out <- bchanged_exp1[, c(2,3,10,12, 13)]
+kbl(bchanged_exp1_out[1:min(10, nrow(bchanged_exp1)),], booktabs = T, align = "c", linesep = "", caption="The top abundant ASVs")%>%
+  kable_styling(latex_options = "HOLD_position")
+
+#write.csv(bchanged_exp1_out, "paper_tables/bchanged_exp1_application.csv")
 
 #exp2
 
-temp <-   sensitive_to_spraying(bDESIGN, bDAT, bTAX, c("ctr","gly","tb"), c(2,5), 2, species = "bacteria")
+temp <-   sensitive_to_application(bDESIGN, bDAT, bTAX, c("ctr","gly","tb"), c(2,5), 2, species = "bacteria")
 bEDGER_summary_exp2 <- temp[[1]]
 bchanged_exp2 <- temp[[2]]
 bEDGER_fit_lrt_table_ASVs_exp2 <- temp[[3]]
@@ -228,17 +237,20 @@ bEDGER_fit_lrt_topTags_exp2 <- temp[[4]]
 lrt_bASVs_exp2 <- temp[[5]]
 bEDGER_fit_lrt_table_exp2 <- temp[[6]]
 
-temp <- cRA_Spraying(bDESIGN, bDAT_rare, c("ctr","gly","tb"), c(2,5), 2, bchanged_exp2)
+temp <- cRA_Application(bDESIGN, bDAT_rare, c("ctr","gly","tb"), c(2,5), 2, bchanged_exp2)
 bCRA_exp2 <- temp[[1]]
 bchanged_exp2 <- temp[[3]]
 
-pander(bEDGER_summary_exp2, justify='left', caption = "Bacteria: Spraying effect in experiment 2") 
-print(paste0(round(bCRA_exp2, 2), "%", " of the bacterial abundance changed between the different spraying targets."))
-pander(bchanged_exp2[1:min(10, nrow(bchanged_exp2)), c(2,3,10,12)], caption="The top abundant ASVs")
+pander(bEDGER_summary_exp2[,c(3,2,1)], justify='left', caption = "Bacteria: Application effect in experiment 2") 
+print(paste0(round(bCRA_exp2, 2), "%", " of the bacterial abundance changed between the different application targets."))
+bchanged_exp2_out <- bchanged_exp2[, c(2,3,10,12, 13)]
+kbl(bchanged_exp2_out[1:min(10, nrow(bchanged_exp2)),], booktabs = T, align = "c", linesep = "", caption="The top abundant ASVs")%>%
+  kable_styling(latex_options = "HOLD_position")
+#write.csv(bchanged_exp2_out, "paper_tables/bchanged_exp2_application.csv")
 
 ```
 
-In experiment 1 were `r paste(length(bEDGER_fit_lrt_table_ASVs_exp1))` bacterial ASVs sensitive to different spraying targets while we found in experiment 2 `r paste(length(bEDGER_fit_lrt_table_ASVs_exp2))` sensitive bacterial ASVs.
+In experiment 1 were `r paste(length(bEDGER_fit_lrt_table_ASVs_exp1))` bacterial ASVs sensitive to different application targets while we found in experiment 2 `r paste(length(bEDGER_fit_lrt_table_ASVs_exp2))` sensitive bacterial ASVs.
 
 \vspace{5mm}
 
@@ -246,11 +258,11 @@ In experiment 1 were `r paste(length(bEDGER_fit_lrt_table_ASVs_exp1))` bacterial
 
 \vspace{5mm}
 
-```{r MA and venn bacteria spraying, echo=F, warning=F, message=F, eval=T, fig.height=8, fig.width=9}
+```{r MA and venn bacteria application, echo=F, warning=F, message=F, eval=T, fig.height=8, fig.width=9}
 
 #colors
-col_weeds_up <- level_cols_Spraying[names(level_cols_Spraying) == "weeds"] %>% as.character()
-col_soil_up <- level_cols_Spraying[names(level_cols_Spraying) == "soil"] %>% as.character()
+col_weeds_up <- level_cols_Application[names(level_cols_Application) == "weeds"] %>% as.character()
+col_soil_up <- level_cols_Application[names(level_cols_Application) == "soil"] %>% as.character()
 
 #create bacteria df
 df1 <- bEDGER_fit_lrt_topTags_exp1[["table"]]
@@ -262,11 +274,15 @@ rm(df1, df2)
 
 #get up and down-regulated ASVs
 df$cols <- "NS"
-df$cols[df$FDR < 0.05 & df$logFC > 0] <- "higher in Weed"
-df$cols[df$FDR < 0.05 & df$logFC < 0] <- "higher in Soil"
+df$logFC <- df$logFC * (-1) #change from hc:ctr to ctr:hc #change from soil:weeds to weeds:soil
+df$cols[df$FDR < 0.05 & df$logFC > 0] <- "higher in weeds"
+df$cols[df$FDR < 0.05 & df$logFC < 0] <- "higher in soil"
 
 #sort to plot sign at the end
 df <- df[order(df$FDR, decreasing = T),]
+
+#factors of col plot
+df$cols <- factor(df$cols, levels=c("higher in weeds", "higher in soil", "NS"))
 
 #plot
 fig6.1.1 <- ggplot(df, aes(x=logCPM, y=logFC))+
@@ -282,19 +298,19 @@ fig6.1.1 <- ggplot(df, aes(x=logCPM, y=logFC))+
 
 #higher in ctr
 #sensitive bacteria
-exp1_ASV_higher <- unique(bEDGER_fit_lrt_table_exp1[["table"]][["ASV_ID"]][bEDGER_fit_lrt_table_exp1[["table"]][["logFC"]]>0])
-exp2_ASV_higher <- unique(bEDGER_fit_lrt_table_exp2[["table"]][["ASV_ID"]][bEDGER_fit_lrt_table_exp1[["table"]][["logFC"]]>0])
+exp1_ASV_higher <- bchanged_exp1$ASV_ID[bchanged_exp1$`logFC weeds:soil`>0]
+exp2_ASV_higher <- bchanged_exp2$ASV_ID[bchanged_exp2$`logFC weeds:soil`>0]
 list_venn <- list(exp1_higher = exp1_ASV_higher, exp2_higher = exp2_ASV_higher)
 #relative abundance
-bCRA_higher_exp1 <- cRA_Spraying(bDESIGN, bDAT_rare, c("ctr","gly","tb"), c(2,5), 2, bchanged_exp1[bchanged_exp1$logFC > 0,])[[1]]
-bCRA_higher_exp2 <- cRA_Spraying(bDESIGN, bDAT_rare, c("ctr","gly","tb"), c(2,5), 2, bchanged_exp2[bchanged_exp2$logFC > 0,])[[1]]
+bCRA_higher_exp1 <- cRA_Application(bDESIGN, bDAT_rare, c("ctr","gly","tb"), c(2,5), 2, bchanged_exp1[bchanged_exp1$`logFC weeds:soil` > 0,])[[1]]
+bCRA_higher_exp2 <- cRA_Application(bDESIGN, bDAT_rare, c("ctr","gly","tb"), c(2,5), 2, bchanged_exp2[bchanged_exp2$`logFC weeds:soil` > 0,])[[1]]
 #labels
 labels <- c(paste0("exp 1\ncRA: ", round(bCRA_higher_exp1, 2), "%"), 
             paste0("exp 2\ncRA: ", round(bCRA_higher_exp2, 2), "%"))
 names(list_venn) <- labels
 #plot
-bvenn_h <- ggvenn(list_venn, fill_color = c(col_weeds_up, col_weeds_up), stroke_size = 0.5, set_name_size = 2.5, show_percentage = F) +
-  facet_wrap(~"higher in Weed")+ #to set title
+bvenn_h <- ggvenn(list_venn, fill_color = c(col_weeds_up, col_weeds_up), stroke_size = 0.5, set_name_size = 3, show_percentage = F) +
+  facet_wrap(~"higher in weeds")+ #to set title
   theme_bw()+ #to get grey title box
   theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),
         axis.title.y=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank(),
@@ -305,19 +321,19 @@ list_venn1 <- list_venn
 
 #lower in ctr
 #sensitive bacteria
-exp1_ASV_lower <- unique(bEDGER_fit_lrt_table_exp1[["table"]][["ASV_ID"]][bEDGER_fit_lrt_table_exp1[["table"]][["logFC"]]<0])
-exp2_ASV_lower <- unique(bEDGER_fit_lrt_table_exp2[["table"]][["ASV_ID"]][bEDGER_fit_lrt_table_exp1[["table"]][["logFC"]]<0])
+exp1_ASV_lower <- bchanged_exp1$ASV_ID[bchanged_exp1$`logFC weeds:soil`<0]
+exp2_ASV_lower <- bchanged_exp2$ASV_ID[bchanged_exp2$`logFC weeds:soil`<0]
 list_venn <- list(exp1_lower = exp1_ASV_lower, exp2_lower = exp2_ASV_lower)
 #relative abundance
-bCRA_lower_exp1 <- cRA_Spraying(bDESIGN, bDAT_rare, c("ctr","gly","tb"), c(2,5), 2, bchanged_exp1[bchanged_exp1$logFC < 0,])[[1]]
-bCRA_lower_exp2 <- cRA_Spraying(bDESIGN, bDAT_rare, c("ctr","gly","tb"), c(2,5), 2, bchanged_exp2[bchanged_exp2$logFC < 0,])[[1]]
+bCRA_lower_exp1 <- cRA_Application(bDESIGN, bDAT_rare, c("ctr","gly","tb"), c(2,5), 2, bchanged_exp1[bchanged_exp1$`logFC weeds:soil` < 0,])[[1]]
+bCRA_lower_exp2 <- cRA_Application(bDESIGN, bDAT_rare, c("ctr","gly","tb"), c(2,5), 2, bchanged_exp2[bchanged_exp2$`logFC weeds:soil` < 0,])[[1]]
 #labels
 labels <- c(paste0("exp 1\ncRA: ", round(bCRA_lower_exp1, 2), "%"), 
             paste0("exp 2\ncRA: ", round(bCRA_lower_exp2, 2), "%"))
 names(list_venn) <- labels
 #plot
-bvenn_l <- ggvenn(list_venn, fill_color = c(col_soil_up, col_soil_up), stroke_size = 0.5, set_name_size = 2.5, show_percentage = F) +
-  facet_wrap(~"higher in Soil")+ #to set title
+bvenn_l <- ggvenn(list_venn, fill_color = c(col_soil_up, col_soil_up), stroke_size = 0.5, set_name_size = 3, show_percentage = F) +
+  facet_wrap(~"higher in soil")+ #to set title
   theme_bw()+ #to get grey title box
   theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),
         axis.title.y=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank(),
@@ -343,7 +359,7 @@ fig6.1 <- plot_grid(fig6.1.1 + theme(legend.position="none"),
 #saveRDS(fig6.1, "paper_figs/RDS/fig6.1.RDS")
 
 #add legend
-legend <- get_legend(fig6.1.1 + theme(legend.position="bottom") + labs(col="Spraying"))
+legend <- get_legend(fig6.1.1 + theme(legend.position="bottom") + labs(col="Application"))
 fig6.1 <- plot_grid(fig6.1, legend, nrow=2, rel_heights=c(1, .1))
 
 #print
@@ -355,10 +371,10 @@ fig6.1
 
 ### Fungi
 
-```{r fun spraying, warning=F, echo=F}
+```{r fun application, warning=F, echo=F}
 
 #exp1
-temp <-   sensitive_to_spraying(fDESIGN, fDAT, fTAX, c("ctr","gly","tb"), c(2,5), 1, species = "fungi")
+temp <-   sensitive_to_application(fDESIGN, fDAT, fTAX, c("ctr","gly","tb"), c(2,5), 1, species = "fungi")
 fEDGER_summary_exp1 <- temp[[1]]
 fchanged_exp1 <- temp[[2]]
 fEDGER_fit_lrt_table_ASVs_exp1 <- temp[[3]]
@@ -366,16 +382,20 @@ fEDGER_fit_lrt_topTags_exp1 <- temp[[4]]
 lrt_fASVs_exp1 <- temp[[5]]
 fEDGER_fit_lrt_table_exp1 <- temp[[6]]
 
-temp <- cRA_Spraying(fDESIGN, fDAT_rare, c("ctr","gly","tb"), c(2,5), 1, fchanged_exp1)
+temp <- cRA_Application(fDESIGN, fDAT_rare, c("ctr","gly","tb"), c(2,5), 1, fchanged_exp1)
 fCRA_exp1 <- temp[[1]]
 fchanged_exp1 <- temp[[3]]
 
-pander(fEDGER_summary_exp1, justify='left', caption = "Fungi: Spraying effect in experiment 1") 
-print(paste0(round(fCRA_exp1, 2), "%", " of the fungal abundance changed between the different spraying targets."))
-pander(fchanged_exp1[1:min(10, nrow(fchanged_exp1)), c(2,3,11,13)], caption="The top abundant ASVs")
+pander(fEDGER_summary_exp1[,c(3,2,1)], justify='left', caption = "Fungi: Application effect in experiment 1") 
+print(paste0(round(fCRA_exp1, 2), "%", " of the fungal abundance changed between the different application targets."))
+fchanged_exp1_out <- fchanged_exp1[, c(2,3,11,13,14)]
+kbl(fchanged_exp1_out[1:min(10, nrow(fchanged_exp1)),], booktabs = T, align = "c", linesep = "", caption="The top abundant ASVs")%>%
+  kable_styling(latex_options = "HOLD_position")
+#write.csv(fchanged_exp1_out, "paper_tables/fchanged_exp1_application.csv")
+
 
 #exp2
-temp <-   sensitive_to_spraying(fDESIGN, fDAT, fTAX, c("ctr","gly","tb"), c(2,5), 2, species = "fungi")
+temp <-   sensitive_to_application(fDESIGN, fDAT, fTAX, c("ctr","gly","tb"), c(2,5), 2, species = "fungi")
 fEDGER_summary_exp2 <- temp[[1]]
 fchanged_exp2 <- temp[[2]]
 fEDGER_fit_lrt_table_ASVs_exp2 <- temp[[3]]
@@ -383,17 +403,20 @@ fEDGER_fit_lrt_topTags_exp2 <- temp[[4]]
 lrt_fASVs_exp2 <- temp[[5]]
 fEDGER_fit_lrt_table_exp2 <- temp[[6]]
 
-temp <- cRA_Spraying(fDESIGN, fDAT_rare, c("ctr","gly","tb"), c(2,5), 2, fchanged_exp2)
+temp <- cRA_Application(fDESIGN, fDAT_rare, c("ctr","gly","tb"), c(2,5), 2, fchanged_exp2)
 fCRA_exp2 <- temp[[1]]
 fchanged_exp2 <- temp[[3]]
 
-pander(fEDGER_summary_exp2, justify='left', caption = "Fungi: Spraying effect in experiment 2") 
-print(paste0(round(fCRA_exp2, 2), "%", " of the fungal abundance changed between the different spraying targets."))
-pander(fchanged_exp2[1:min(10, nrow(fchanged_exp2)), c(2,3,11,13)], caption="The top abundant ASVs")
+pander(fEDGER_summary_exp2[,c(3,2,1)], justify='left', caption = "Fungi: Application effect in experiment 2") 
+print(paste0(round(fCRA_exp2, 2), "%", " of the fungal abundance changed between the different application targets."))
+fchanged_exp2_out <- fchanged_exp2[, c(2,3,11,13,14)]
+kbl(fchanged_exp2_out[1:min(10, nrow(fchanged_exp2)),], booktabs = T, align = "c", linesep = "", caption="The top abundant ASVs")%>%
+  kable_styling(latex_options = "HOLD_position")
+#write.csv(fchanged_exp2_out, "paper_tables/fchanged_exp2_application.csv")
 
 ```
 
-In experiment 1 were `r paste(length(fEDGER_fit_lrt_table_ASVs_exp1))` fungal ASVs sensitive to different spraying targets while we found in experiment 2 `r paste(length(fEDGER_fit_lrt_table_ASVs_exp2))` sensitive fungal ASVs.
+In experiment 1 were `r paste(length(fEDGER_fit_lrt_table_ASVs_exp1))` fungal ASVs sensitive to different application targets while we found in experiment 2 `r paste(length(fEDGER_fit_lrt_table_ASVs_exp2))` sensitive fungal ASVs.
 
 \vspace{5mm}
 
@@ -401,7 +424,7 @@ In experiment 1 were `r paste(length(fEDGER_fit_lrt_table_ASVs_exp1))` fungal AS
 
 \vspace{5mm}
 
-```{r MA and venn fungi spraying, echo=F, warning=F, message=F, eval=T, fig.height=8, fig.width=9}
+```{r MA and venn fungi application, echo=F, warning=F, message=F, eval=T, fig.height=8, fig.width=9}
 
 #create fungi df
 df1 <- fEDGER_fit_lrt_topTags_exp1[["table"]]
@@ -413,12 +436,15 @@ rm(df1, df2)
 
 #get up and down-regulated ASVs
 df$cols <- "NS"
-df$cols[df$FDR < 0.05 & df$logFC > 0] <- "higher in Weed"
-df$cols[df$FDR < 0.05 & df$logFC < 0] <- "higher in Soil"
+#df$logFC <- df$logFC * (-1) #change from hc:ctr to ctr:hc #change from soil:weeds to weeds:soil
+df$cols[df$FDR < 0.05 & df$logFC > 0] <- "higher in weeds"
+df$cols[df$FDR < 0.05 & df$logFC < 0] <- "higher in soil"
 
 #sort to plot sign at the end
 df <- df[order(df$FDR, decreasing = T),]
 
+#factors of col plot
+df$cols <- factor(df$cols, levels=c("higher in weeds", "higher in soil", "NS"))
 
 fig6.2.1 <- ggplot(df, aes(x=logCPM, y=logFC))+
               geom_point(aes(col=cols), alpha=0.8, size=2)+
@@ -433,39 +459,40 @@ fig6.2.1 <- ggplot(df, aes(x=logCPM, y=logFC))+
 
 #higher in ctr
 #sensitive fungi
-exp1_ASV_higher <- unique(fEDGER_fit_lrt_table_exp1[["table"]][["ASV_ID"]][fEDGER_fit_lrt_table_exp1[["table"]][["logFC"]]>0])
-exp2_ASV_lower <- unique(fEDGER_fit_lrt_table_exp2[["table"]][["ASV_ID"]][fEDGER_fit_lrt_table_exp1[["table"]][["logFC"]]>0])
+exp1_ASV_higher <- fchanged_exp1$ASV_ID[fchanged_exp1$`logFC weeds:soil`>0]
+exp2_ASV_higher <- fchanged_exp2$ASV_ID[fchanged_exp2$`logFC weeds:soil`>0]
 list_venn <- list(exp1_higher = exp1_ASV_higher, exp2_higher = exp2_ASV_higher)
 #relative abundance
-fCRA_higher_exp1 <- cRA_Spraying(fDESIGN, fDAT_rare, c("ctr","gly","tb"), c(2,5), 2, fchanged_exp1[fchanged_exp1$logFC > 0,])[[1]]
-fCRA_higher_exp2 <- cRA_Spraying(fDESIGN, fDAT_rare, c("ctr","gly","tb"), c(2,5), 2, fchanged_exp2[fchanged_exp2$logFC > 0,])[[1]]
+fCRA_higher_exp1 <- cRA_Application(fDESIGN, fDAT_rare, c("ctr","gly","tb"), c(2,5), 2, fchanged_exp1[fchanged_exp1$`logFC weeds:soil` > 0,])[[1]]
+fCRA_higher_exp2 <- cRA_Application(fDESIGN, fDAT_rare, c("ctr","gly","tb"), c(2,5), 2, fchanged_exp2[fchanged_exp2$`logFC weeds:soil` > 0,])[[1]]
 #labels
 labels <- c(paste0("exp 1\ncRA: ", round(fCRA_higher_exp1, 2), "%"), 
             paste0("exp 2\ncRA: ", round(fCRA_higher_exp2, 2), "%"))
 names(list_venn) <- labels
 #plot
-fvenn_h <- ggvenn(list_venn, fill_color = c(col_weeds_up, col_weeds_up), stroke_size = 0.5, set_name_size = 2.5, show_percentage = F) +
-  facet_wrap(~"higher in Weed")+ #to set title
+fvenn_h <- ggvenn(list_venn, fill_color = c(col_weeds_up, col_weeds_up), stroke_size = 0.5, set_name_size = 3, show_percentage = F) +
+  facet_wrap(~"higher in weeds")+ #to set title
   theme_bw()+ #to get grey title box
   theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),
         axis.title.y=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank(),
         line = element_blank()) #to remove axes and axes lines
+  
 
 #lower in ctr
 #sensitive fungi
-exp1_ASV_lower <- unique(fEDGER_fit_lrt_table_exp1[["table"]][["ASV_ID"]][fEDGER_fit_lrt_table_exp1[["table"]][["logFC"]]<0])
-exp2_ASV_lower <- unique(fEDGER_fit_lrt_table_exp2[["table"]][["ASV_ID"]][fEDGER_fit_lrt_table_exp1[["table"]][["logFC"]]<0])
+exp1_ASV_lower <- fchanged_exp1$ASV_ID[fchanged_exp1$`logFC weeds:soil`<0]
+exp2_ASV_lower <- fchanged_exp2$ASV_ID[fchanged_exp2$`logFC weeds:soil`<0]
 list_venn <- list(exp1_lower = exp1_ASV_lower, exp2_lower = exp2_ASV_lower)
 #relative abundance
-fCRA_lower_exp1 <- cRA_Spraying(fDESIGN, fDAT_rare, c("ctr","gly","tb"), c(2,5), 2, fchanged_exp1[fchanged_exp1$logFC < 0,])[[1]]
-fCRA_lower_exp2 <- cRA_Spraying(fDESIGN, fDAT_rare, c("ctr","gly","tb"), c(2,5), 2, fchanged_exp2[fchanged_exp2$logFC < 0,])[[1]]
+fCRA_lower_exp1 <- cRA_Application(fDESIGN, fDAT_rare, c("ctr","gly","tb"), c(2,5), 2, fchanged_exp1[fchanged_exp1$`logFC weeds:soil` < 0,])[[1]]
+fCRA_lower_exp2 <- cRA_Application(fDESIGN, fDAT_rare, c("ctr","gly","tb"), c(2,5), 2, fchanged_exp2[fchanged_exp2$`logFC weeds:soil` < 0,])[[1]]
 #labels
 labels <- c(paste0("exp 1\ncRA: ", round(fCRA_lower_exp1, 2), "%"), 
             paste0("exp 2\ncRA: ", round(fCRA_lower_exp2, 2), "%"))
 names(list_venn) <- labels
 #plot
-fvenn_l <- ggvenn(list_venn, fill_color = c(col_soil_up, col_soil_up), stroke_size = 0.5, set_name_size = 2.5, show_percentage = F) +
-  facet_wrap(~"higher in Soil")+ #to set title
+fvenn_l <- ggvenn(list_venn, fill_color = c(col_soil_up, col_soil_up), stroke_size = 0.5, set_name_size = 3, show_percentage = F) +
+  facet_wrap(~"higher in soil")+ #to set title
   theme_bw()+ #to get grey title box
   theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),
         axis.title.y=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank(),
@@ -489,7 +516,7 @@ fig6.2 <- plot_grid(fig6.2.1 + theme(legend.position="none"),
 #saveRDS(fig6.2, "paper_figs/RDS/fig6.2.RDS")
 
 #add legend
-legend <- get_legend(fig6.2.1 + theme(legend.position="bottom") + labs(col="Spraying"))
+legend <- get_legend(fig6.2.1 + theme(legend.position="bottom") + labs(col="Application"))
 fig6.2 <- plot_grid(fig6.2, legend, nrow=2, rel_heights=c(1, .1))
 
 #print
@@ -500,7 +527,7 @@ fig6.2
 
 \vspace{5mm}
 
-**Conclusion:** Different spraying targets altered bacterial and fungal community members in their relative abundance. The majority of sensitive ASVs are not abundant in the rhizosphere, that's why only small_exp1 percentages were changed due to spraying herbicides. Most of the changed ASVs were only sensitive either in experiment 1 or experiment 2.
+**Conclusion:** Different application targets altered bacterial and fungal community members in their relative abundance. The majority of sensitive ASVs are not abundant in the rhizosphere, that's why only small_exp1 percentages were changed due to application herbicides. Most of the changed ASVs were only sensitive either in experiment 1 or experiment 2.
 
 \pagebreak
 
@@ -511,10 +538,10 @@ We treated samples either with water (control), glyphosate or terbuthylazine. We
 
 ```{r function Herbicide, warning=F, echo=F}
 
-sensitive_to_herbicide <- function(DESIGN, DAT, TAX, Herbicide, Timepoint, Experiment, threshold.filter=7, species="bacteria"){
+sensitive_to_herbicide <- function(DESIGN, DAT, TAX, Herbicide, Time, Experiment, threshold.filter=7, species="bacteria"){
   
   #subset datasets
-  temp <-   get_Herbicide_Timepoint_Experiment(DESIGN, DAT, TAX, Herbicide, Timepoint, Experiment)
+  temp <-   get_Herbicide_Time_Experiment(DESIGN, DAT, TAX, Herbicide, Time, Experiment)
   DES_sub <- temp[[1]]
   DAT_sub <- temp[[2]]
   TAX_sub <- temp[[3]]
@@ -529,8 +556,8 @@ sensitive_to_herbicide <- function(DESIGN, DAT, TAX, Herbicide, Timepoint, Exper
   EDGER_fit <- fit.model.edgeR(EDGER, DES_sub$Herbicide)
 
   #glmLRT - weeds vs soil
-  if("gly" %in% Herbicide){contrasts <- makeContrasts(gly - ctr, levels=DES_sub$Herbicide)}
-  if("tb" %in% Herbicide){contrasts <- makeContrasts(tb - ctr, levels=DES_sub$Herbicide)}
+  if("gly" %in% Herbicide){contrasts <- makeContrasts(ctr - gly, levels=DES_sub$Herbicide)}
+  if("tb" %in% Herbicide){contrasts <- makeContrasts(ctr - tb, levels=DES_sub$Herbicide)}
   EDGER_fit_lrt <- glmLRT(EDGER_fit, contrast=contrasts)
   EDGER_fit_lrt_topTags <- topTags(EDGER_fit_lrt, n=Inf, p.value=1)  # all_exp1 stat tests
   EDGER_fit_lrt_table <- topTags(EDGER_fit_lrt, n=nrow(EDGER_fit$counts), adjust.method="BH", sort.by="PValue", p.value=0.05)
@@ -539,8 +566,8 @@ sensitive_to_herbicide <- function(DESIGN, DAT, TAX, Herbicide, Timepoint, Exper
 
   # summary of differentiall_exp1y abundant ASVs
   EDGER_summary <- t(summary(decideTestsDGE(EDGER_fit_lrt, p.value=0.05)))
-  if("gly" %in% Herbicide){colnames(EDGER_summary) <- c("lower in gly", "unchanged", "higher in gly")}
-  if("tb" %in% Herbicide){colnames(EDGER_summary) <- c("lower in tb", "unchanged", "higher in tb")}
+  if("gly" %in% Herbicide){colnames(EDGER_summary) <- c("higher in gly", "unchanged", "lower in gly")}
+  if("tb" %in% Herbicide){colnames(EDGER_summary) <- c("higher in tb", "unchanged", "lower in tb")}
   rownames(EDGER_summary) <- NULL
 
   # # Identification of differentiall_exp1y abundant ASVs
@@ -548,6 +575,9 @@ sensitive_to_herbicide <- function(DESIGN, DAT, TAX, Herbicide, Timepoint, Exper
   changed <- cbind(TAX[lrt_ASVs, ], EDGER_fit_lrt_table[["table"]][["logFC"]])
   if(species=="bacteria"){try(colnames(changed)[10] <- "logFC", silent = T)}
   if(species=="fungi"){try(colnames(changed)[11] <- "logFC", silent = T)}
+  
+  try(changed$logFC <- round(changed$logFC, 3))
+  colnames(changed)[colnames(changed)=="logFC"] <- "logFC ctr:hc"
 
   return(list(EDGER_summary, changed, EDGER_fit_lrt_table_ASVs, EDGER_fit_lrt_topTags, lrt_ASVs, EDGER_fit_lrt_table))
 
@@ -558,11 +588,11 @@ sensitive_to_herbicide <- function(DESIGN, DAT, TAX, Herbicide, Timepoint, Exper
 
 ```{r function cRA Herbicide, warning=F, echo=F}
 
-cRA_Herbicide <- function(DESIGN, DAT_rare, Herbicide, Timepoint, Experiment, changed){
+cRA_Herbicide <- function(DESIGN, DAT_rare, Herbicide, Time, Experiment, changed){
   
   ##samples
-  samples_hc <- DESIGN$Label[which(DESIGN$Herbicide %in% Herbicide & DESIGN$Timepoint %in% Timepoint & DESIGN$Experiment %in% Experiment)]
-  samples_ctr <- DESIGN$Label[which(DESIGN$Herbicide %in% "ctr" & DESIGN$Timepoint %in% Timepoint & DESIGN$Experiment %in% Experiment)]
+  samples_hc <- DESIGN$Label[which(DESIGN$Herbicide %in% Herbicide & DESIGN$Time %in% Time & DESIGN$Experiment %in% Experiment)]
+  samples_ctr <- DESIGN$Label[which(DESIGN$Herbicide %in% "ctr" & DESIGN$Time %in% Time & DESIGN$Experiment %in% Experiment)]
   
   #subsetting and normalization
   DAT_rare_hc <- DAT_rare[, samples_hc ]
@@ -599,13 +629,15 @@ cRA_Herbicide <- function(DESIGN, DAT_rare, Herbicide, Timepoint, Experiment, ch
 
   DAT_rare_MEANs$rank <- as.numeric(gsub("ASV", "", rownames(DAT_rare_MEANs)))
   DAT_rare_MEANs <- DAT_rare_MEANs[order(DAT_rare_MEANs$rank),] #sort by ASV rank
-
+  
   #add abundance to changed-data
   changed <- changed[changed$ASV_ID %in% rownames(DAT_rare_MEANs),]#ommit errors if not all_exp1 ASVs in changed are in DAT_rare
-  changed$rAbu <- DAT_rare_MEANs[rownames(DAT_rare_MEANs) %in% changed$ASV_ID, 1]#add abu
-  changed <- changed[order(changed$rAbu, decreasing = T),] #sort by abu
-  try(changed$rAbu <- paste0(round(changed$rAbu,2), "%"), silent = T)
-  
+  changed$rAbu_ctr <- DAT_rare_MEANs[rownames(DAT_rare_MEANs) %in% changed$ASV_ID,  colnames(DAT_rare_MEANs)=="ctr"]#add abu
+  changed$rAbu_hc <- DAT_rare_MEANs[rownames(DAT_rare_MEANs) %in% changed$ASV_ID,  colnames(DAT_rare_MEANs)=="hc"]#add abu
+  changed <- changed[order(changed$rAbu_ctr, decreasing = T),] #sort by abu
+  try(changed$rAbu_ctr <- paste0(round(changed$rAbu_ctr,3), "%"), silent = T)
+  try(changed$rAbu_hc <- paste0(round(changed$rAbu_hc,3), "%"), silent = T)
+
   return(list(cRA_hc, cRA_ctr, changed))
 
 }
@@ -631,9 +663,13 @@ temp <- cRA_Herbicide(bDESIGN, bDAT_rare, c("ctr","gly"), c(2,5), 1, bchanged_gl
 bCRA_gly_exp1 <- temp[[1]]
 bchanged_gly_exp1 <- temp[[3]]
 
-pander(bEDGER_summary_gly_exp1, justify='left', caption = "Bacteria: Glyphosate effect in experiment 1") 
-print(paste0(round(bCRA_gly_exp1, 2), "%", " of the bacterial abundance changed after spraying glyphosate"))
-pander(bchanged_gly_exp1[1:min(10, nrow(bchanged_gly_exp1)), c(2,3,10,12)], caption="The top abundant ASVs")
+pander(bEDGER_summary_gly_exp1[,c(3,2,1)], justify='left', caption = "Bacteria: Glyphosate effect in experiment 1") 
+print(paste0(round(bCRA_gly_exp1, 2), "%", " of the bacterial abundance changed after applying glyphosate"))
+bchanged_gly_exp1_out <- bchanged_gly_exp1[, c(2,3,10,12,13)]
+kbl(bchanged_gly_exp1_out[1:min(10, nrow(bchanged_gly_exp1)),], booktabs = T, align = "c", linesep = "", caption="The top abundant ASVs")%>%
+  kable_styling(latex_options = "HOLD_position")
+
+#write.csv(bchanged_gly_exp1_out, "paper_tables/bchanged_gly_exp1.csv")
 
 #tb
 temp <-   sensitive_to_herbicide(bDESIGN, bDAT, bTAX, c("ctr","tb"), c(2,5), 1, species = "bacteria")
@@ -648,9 +684,13 @@ temp <- cRA_Herbicide(bDESIGN, bDAT_rare, c("ctr","tb"), c(2,5), 1, bchanged_tb_
 bCRA_tb_exp1 <- temp[[1]]
 bchanged_tb_exp1 <- temp[[3]]
 
-pander(bEDGER_summary_tb_exp1, justify='left', caption = "Bacteria: Terbuthylazine effect in experiment 1") 
-print(paste0(round(bCRA_tb_exp1, 2), "%", " of the bacterial abundance changed after spraying terbuthylazine"))
-pander(bchanged_tb_exp1[1:min(10, nrow(bchanged_tb_exp1)), c(2,3,10,12)], caption="The top abundant ASVs")
+pander(bEDGER_summary_tb_exp1[,c(3,2,1)], justify='left', caption = "Bacteria: Terbuthylazine effect in experiment 1") 
+print(paste0(round(bCRA_tb_exp1, 2), "%", " of the bacterial abundance changed after applying terbuthylazine"))
+bchanged_tb_exp1_out <- bchanged_tb_exp1[, c(2,3,10,12,13)]
+kbl(bchanged_tb_exp1_out[1:min(10, nrow(bchanged_tb_exp1_out)),], booktabs = T, align = "c", linesep = "", caption="The top abundant ASVs")%>%
+  kable_styling(latex_options = "HOLD_position")
+
+#write.csv(bchanged_tb_exp1_out, "paper_tables/bchanged_tb_exp1.csv")
 
 ```
 
@@ -673,9 +713,13 @@ temp <- cRA_Herbicide(bDESIGN, bDAT_rare, c("ctr","gly"), c(2,5), 2, bchanged_gl
 bCRA_gly_exp2 <- temp[[1]]
 bchanged_gly_exp2 <- temp[[3]]
 
-pander(bEDGER_summary_gly_exp2, justify='left', caption = "Bacteria: Glyphosate effect in experiment 2") 
-print(paste0(round(bCRA_gly_exp2, 2), "%", " of the bacterial abundance changed after spraying glyphosate"))
-pander(bchanged_gly_exp2[1:min(10, nrow(bchanged_gly_exp2)), c(2,3,10,12)], caption="The top abundant ASVs")
+pander(bEDGER_summary_gly_exp2[,c(3,2,1)], justify='left', caption = "Bacteria: Glyphosate effect in experiment 2") 
+print(paste0(round(bCRA_gly_exp2, 2), "%", " of the bacterial abundance changed after applying glyphosate"))
+bchanged_gly_exp2_out <- bchanged_gly_exp2[, c(2,3,10,12,13)]
+kbl(bchanged_gly_exp2_out[1:min(10, nrow(bchanged_gly_exp2_out)),], booktabs = T, align = "c", linesep = "", caption="The top abundant ASVs")%>%
+  kable_styling(latex_options = "HOLD_position")
+
+#write.csv(bchanged_gly_exp2_out, "paper_tables/bchanged_gly_exp2.csv")
 
 #tb
 temp <-   sensitive_to_herbicide(bDESIGN, bDAT, bTAX, c("ctr","tb"), c(2,5), 2, species = "bacteria")
@@ -690,14 +734,17 @@ temp <- cRA_Herbicide(bDESIGN, bDAT_rare, c("ctr","tb"), c(2,5), 2, bchanged_tb_
 bCRA_tb_exp2 <- temp[[1]]
 bchanged_tb_exp2 <- temp[[3]]
 
-pander(bEDGER_summary_tb_exp2, justify='left', caption = "Bacteria: Terbuthylazine effect in experiment 2") 
-print(paste0(round(bCRA_tb_exp2, 2), "%", " of the bacterial abundance changed after spraying terbuthylazine"))
-pander(bchanged_tb_exp2[1:min(10, nrow(bchanged_tb_exp2)), c(2,3,10,12)], caption="The top abundant ASVs")
+pander(bEDGER_summary_tb_exp2[,c(3,2,1)], justify='left', caption = "Bacteria: Terbuthylazine effect in experiment 2") 
+print(paste0(round(bCRA_tb_exp2, 2), "%", " of the bacterial abundance changed after applying terbuthylazine"))
+bchanged_tb_exp2_out <- bchanged_tb_exp2[, c(2,3,10,12,13)]
+kbl(bchanged_tb_exp2_out[1:min(10, nrow(bchanged_tb_exp2_out)),], booktabs = T, align = "c", linesep = "", caption="The top abundant ASVs")%>%
+  kable_styling(latex_options = "HOLD_position")
 
+#write.csv(bchanged_tb_exp2_out, "paper_tables/bchanged_tb_exp2.csv")
 
 ```
 
-Glyphosate changed the abundance of `r paste(length(bEDGER_fit_lrt_table_ASVs_gly_exp1))` bacterial ASVs in experiment 1 and `r paste(length(bEDGER_fit_lrt_table_ASVs_gly_exp2))` bacterial ASVs in experiment 2. Spraying terbuthylazine led to changes in abundance for `r paste(length(bEDGER_fit_lrt_table_ASVs_tb_exp1))` bacterial ASVs in experiment 1 and `r paste(length(bEDGER_fit_lrt_table_ASVs_tb_exp2))` bacterial ASVs in experiment 2.
+Glyphosate changed the abundance of `r paste(length(bEDGER_fit_lrt_table_ASVs_gly_exp1))` bacterial ASVs in experiment 1 and `r paste(length(bEDGER_fit_lrt_table_ASVs_gly_exp2))` bacterial ASVs in experiment 2. Application terbuthylazine led to changes in abundance for `r paste(length(bEDGER_fit_lrt_table_ASVs_tb_exp1))` bacterial ASVs in experiment 1 and `r paste(length(bEDGER_fit_lrt_table_ASVs_tb_exp2))` bacterial ASVs in experiment 2.
 
 ### Figure 7.1 | Bacteria: MA & venn
 
@@ -724,6 +771,7 @@ rm(df1, df2)
 
 #get up and down-regulated ASVs
 df$cols <- "NS"
+#df$logFC <- df$logFC * (-1) #change from hc:ctr to ctr:hc #change from hc:ctr to ctr:hc
 df$cols[df$FDR < 0.05 & df$logFC > 0] <- "higher in ctr"
 df$cols[df$FDR < 0.05 & df$logFC < 0] <- "higher in gly"
 
@@ -753,6 +801,7 @@ rm(df1, df2)
 
 #get up and down-regulated ASVs
 df$cols <- "NS"
+#df$logFC <- df$logFC * (-1) #change from hc:ctr to ctr:hc #change from hc:ctr to ctr:hc
 df$cols[df$FDR < 0.05 & df$logFC > 0] <- "higher in ctr"
 df$cols[df$FDR < 0.05 & df$logFC < 0] <- "higher in tb"
 
@@ -779,30 +828,30 @@ fig7.1.1 <- plot_grid(fig7.1.1_gly + theme(legend.position="none", plot.margin =
 
 #higher in ctr
 #sensitive bacteria gly
-exp1_ASV_higher <- unique(bEDGER_fit_lrt_table_gly_exp1[["table"]][["ASV_ID"]][bEDGER_fit_lrt_table_gly_exp1[["table"]][["logFC"]]>0])
-exp2_ASV_higher <- unique(bEDGER_fit_lrt_table_gly_exp2[["table"]][["ASV_ID"]][bEDGER_fit_lrt_table_gly_exp2[["table"]][["logFC"]]>0])
+exp1_ASV_higher <- bchanged_gly_exp1$ASV_ID[bchanged_gly_exp1$`logFC ctr:hc`>0]
+exp2_ASV_higher <- bchanged_gly_exp2$ASV_ID[bchanged_gly_exp2$`logFC ctr:hc`>0]
 list_venn_gly <- list(exp1_higher = exp1_ASV_higher, exp2_higher = exp2_ASV_higher)
 #relative abundance
-bCRA_higher_gly_exp1 <- cRA_Spraying(bDESIGN, bDAT_rare, c("ctr","gly"), c(2,5), 1, bchanged_gly_exp1[bchanged_gly_exp1$logFC > 0,])[[1]]
-bCRA_higher_gly_exp2 <- cRA_Spraying(bDESIGN, bDAT_rare, c("ctr","gly"), c(2,5), 2, bchanged_gly_exp2[bchanged_gly_exp2$logFC > 0,])[[1]]
+bCRA_higher_gly_exp1 <- cRA_Application(bDESIGN, bDAT_rare, c("ctr","gly"), c(2,5), 1, bchanged_gly_exp1[bchanged_gly_exp1$`logFC ctr:hc` > 0,])[[1]]
+bCRA_higher_gly_exp2 <- cRA_Application(bDESIGN, bDAT_rare, c("ctr","gly"), c(2,5), 2, bchanged_gly_exp2[bchanged_gly_exp2$`logFC ctr:hc` > 0,])[[1]]
 #sensitive bacteria tb
-exp1_ASV_higher <- unique(bEDGER_fit_lrt_table_tb_exp1[["table"]][["ASV_ID"]][bEDGER_fit_lrt_table_tb_exp1[["table"]][["logFC"]]>0])
-exp2_ASV_higher <- unique(bEDGER_fit_lrt_table_tb_exp2[["table"]][["ASV_ID"]][bEDGER_fit_lrt_table_tb_exp2[["table"]][["logFC"]]>0])
+exp1_ASV_higher <- bchanged_tb_exp1$ASV_ID[bchanged_tb_exp1$`logFC ctr:hc`>0]
+exp2_ASV_higher <- bchanged_tb_exp2$ASV_ID[bchanged_tb_exp2$`logFC ctr:hc`>0]
 list_venn_tb <- list(exp1_higher = exp1_ASV_higher, exp2_higher = exp2_ASV_higher)
 #relative abundance
-bCRA_higher_tb_exp1 <- cRA_Spraying(bDESIGN, bDAT_rare, c("ctr","tb"), c(2,5), 1, bchanged_tb_exp1[bchanged_tb_exp1$logFC > 0,])[[1]]
-bCRA_higher_tb_exp2 <- cRA_Spraying(bDESIGN, bDAT_rare, c("ctr","tb"), c(2,5), 2, bchanged_tb_exp2[bchanged_tb_exp2$logFC > 0,])[[1]]
+bCRA_higher_tb_exp1 <- cRA_Application(bDESIGN, bDAT_rare, c("ctr","tb"), c(2,5), 1, bchanged_tb_exp1[bchanged_tb_exp1$`logFC ctr:hc` > 0,])[[1]]
+bCRA_higher_tb_exp2 <- cRA_Application(bDESIGN, bDAT_rare, c("ctr","tb"), c(2,5), 2, bchanged_tb_exp2[bchanged_tb_exp2$`logFC ctr:hc` > 0,])[[1]]
 
 #labels
 list_venn <- c(list_venn_gly, list_venn_tb)
-labels <- c(paste0("exp 1\ncRA:", round(bCRA_higher_gly_exp1, 2), "%"), 
-            paste0("exp 2\ncRA:", round(bCRA_higher_gly_exp2, 2), "%"),
-            paste0("exp 1\ncRA:", round(bCRA_higher_tb_exp1, 2), "%"), 
-            paste0("exp 2\ncRA:", round(bCRA_higher_tb_exp2, 2), "%"))
+labels <- c(paste0("exp 1\ncRA: ", round(bCRA_higher_gly_exp1, 2), "%"), 
+            paste0("exp 2\ncRA: ", round(bCRA_higher_gly_exp2, 2), "%"),
+            paste0("exp 1\ncRA: ", round(bCRA_higher_tb_exp1, 2), "%"), 
+            paste0("exp 2\ncRA: ", round(bCRA_higher_tb_exp2, 2), "%"))
 names(list_venn) <- labels
 
 #plot
-bvenn_h <- ggvenn(list_venn, fill_color = c(col_gly_up, col_gly_up, col_tb_up, col_tb_up), stroke_size = 0.5, set_name_size = 1.5, show_percentage = F) +
+bvenn_h <- ggvenn(list_venn, fill_color = c(col_gly_up, col_gly_up, col_tb_up, col_tb_up), stroke_size = 0.5, set_name_size = 2, show_percentage = F) +
   facet_wrap(~"higher in ctr")+ #to set title
   theme_bw()+ #to get grey title box
   theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),
@@ -812,30 +861,30 @@ bvenn_h <- ggvenn(list_venn, fill_color = c(col_gly_up, col_gly_up, col_tb_up, c
 
 #lower in ctr
 #sensitive bacteria gly
-exp1_ASV_lower <- unique(bEDGER_fit_lrt_table_gly_exp1[["table"]][["ASV_ID"]][bEDGER_fit_lrt_table_gly_exp1[["table"]][["logFC"]]<0])
-exp2_ASV_lower <- unique(bEDGER_fit_lrt_table_gly_exp2[["table"]][["ASV_ID"]][bEDGER_fit_lrt_table_gly_exp2[["table"]][["logFC"]]<0])
+exp1_ASV_lower <- bchanged_gly_exp1$ASV_ID[bchanged_gly_exp1$`logFC ctr:hc`<0]
+exp2_ASV_lower <- bchanged_gly_exp2$ASV_ID[bchanged_gly_exp2$`logFC ctr:hc`<0]
 list_venn_gly <- list(exp1_lower = exp1_ASV_lower, exp2_lower = exp2_ASV_lower)
 #relative abundance
-bCRA_lower_gly_exp1 <- cRA_Spraying(bDESIGN, bDAT_rare, c("ctr","gly"), c(2,5), 1, bchanged_gly_exp1[bchanged_gly_exp1$logFC < 0,])[[1]]
-bCRA_lower_gly_exp2 <- cRA_Spraying(bDESIGN, bDAT_rare, c("ctr","gly"), c(2,5), 2, bchanged_gly_exp2[bchanged_gly_exp2$logFC < 0,])[[1]]
+bCRA_lower_gly_exp1 <- cRA_Application(bDESIGN, bDAT_rare, c("ctr","gly"), c(2,5), 1, bchanged_gly_exp1[bchanged_gly_exp1$`logFC ctr:hc` < 0,])[[1]]
+bCRA_lower_gly_exp2 <- cRA_Application(bDESIGN, bDAT_rare, c("ctr","gly"), c(2,5), 2, bchanged_gly_exp2[bchanged_gly_exp2$`logFC ctr:hc` < 0,])[[1]]
 #sensitive bacteria tb
-exp1_ASV_lower <- unique(bEDGER_fit_lrt_table_tb_exp1[["table"]][["ASV_ID"]][bEDGER_fit_lrt_table_tb_exp1[["table"]][["logFC"]]<0])
-exp2_ASV_lower <- unique(bEDGER_fit_lrt_table_tb_exp2[["table"]][["ASV_ID"]][bEDGER_fit_lrt_table_tb_exp2[["table"]][["logFC"]]<0])
+exp1_ASV_lower <- bchanged_tb_exp1$ASV_ID[bchanged_tb_exp1$`logFC ctr:hc`<0]
+exp2_ASV_lower <- bchanged_tb_exp2$ASV_ID[bchanged_tb_exp2$`logFC ctr:hc`<0]
 list_venn_tb <- list(exp1_lower = exp1_ASV_lower, exp2_lower = exp2_ASV_lower)
 #relative abundance
-bCRA_lower_tb_exp1 <- cRA_Spraying(bDESIGN, bDAT_rare, c("ctr","tb"), c(2,5), 1, bchanged_tb_exp1[bchanged_tb_exp1$logFC < 0,])[[1]]
-bCRA_lower_tb_exp2 <- cRA_Spraying(bDESIGN, bDAT_rare, c("ctr","tb"), c(2,5), 2, bchanged_tb_exp2[bchanged_tb_exp2$logFC < 0,])[[1]]
+bCRA_lower_tb_exp1 <- cRA_Application(bDESIGN, bDAT_rare, c("ctr","tb"), c(2,5), 1, bchanged_tb_exp1[bchanged_tb_exp1$`logFC ctr:hc` < 0,])[[1]]
+bCRA_lower_tb_exp2 <- cRA_Application(bDESIGN, bDAT_rare, c("ctr","tb"), c(2,5), 2, bchanged_tb_exp2[bchanged_tb_exp2$`logFC ctr:hc` < 0,])[[1]]
 
 #labels
 list_venn <- c(list_venn_gly, list_venn_tb)
-labels <- c(paste0("exp 1\ncRA:", round(bCRA_lower_gly_exp1, 2), "%"), 
-            paste0("exp 2\ncRA:", round(bCRA_lower_gly_exp2, 2), "%"),
-            paste0("exp 1\ncRA:", round(bCRA_lower_tb_exp1, 2), "%"), 
-            paste0("exp 2\ncRA:", round(bCRA_lower_tb_exp2, 2), "%"))
+labels <- c(paste0("exp 1\ncRA: ", round(bCRA_lower_gly_exp1, 2), "%"), 
+            paste0("exp 2\ncRA: ", round(bCRA_lower_gly_exp2, 2), "%"),
+            paste0("exp 1\ncRA: ", round(bCRA_lower_tb_exp1, 2), "%"), 
+            paste0("exp 2\ncRA: ", round(bCRA_lower_tb_exp2, 2), "%"))
 names(list_venn) <- labels
 
 #plot
-bvenn_l <- ggvenn(list_venn, fill_color = c(col_gly_up, col_gly_up, col_tb_up, col_tb_up), stroke_size = 0.5, set_name_size = 1.5, show_percentage = F) +
+bvenn_l <- ggvenn(list_venn, fill_color = c(col_gly_up, col_gly_up, col_tb_up, col_tb_up), stroke_size = 0.5, set_name_size = 2, show_percentage = F) +
   facet_wrap(~"higher in hc")+ #to set title
   theme_bw()+ #to get grey title box
   theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),
@@ -870,7 +919,7 @@ pseudo <- ggplot(df, aes(x,y, col=Herbicide))+
             theme_bw()
 
 #add legend
-legend <- get_legend(pseudo + theme(legend.position="bottom") + labs(col="Spraying"))
+legend <- get_legend(pseudo + theme(legend.position="bottom") + labs(col="Application"))
 fig7.1 <- plot_grid(fig7.1, legend, nrow=2, rel_heights=c(1, .1))
 
 #print
@@ -899,9 +948,13 @@ temp <- cRA_Herbicide(fDESIGN, fDAT_rare, c("ctr","gly"), c(2,5), 1, fchanged_gl
 fCRA_gly_exp1 <- temp[[1]]
 fchanged_gly_exp1 <- temp[[3]]
 
-pander(fEDGER_summary_gly_exp1, justify='left', caption = "Fungi: Glyphosate effect in experiment 1") 
-print(paste0(round(fCRA_gly_exp1, 2), "%", " of the fungal abundance changed after spraying glyphosate"))
-pander(fchanged_gly_exp1[1:min(10, nrow(fchanged_gly_exp1)), c(2,3,10,12)], caption="The top abundant ASVs")
+pander(fEDGER_summary_gly_exp1[,c(3,2,1)], justify='left', caption = "Fungi: Glyphosate effect in experiment 1") 
+print(paste0(round(fCRA_gly_exp1, 2), "%", " of the fungal abundance changed after applying glyphosate"))
+fchanged_gly_exp1_out <- fchanged_gly_exp1[, c(2,3,11,13,14)]
+kbl(fchanged_gly_exp1_out[1:min(10, nrow(fchanged_gly_exp1_out)),], booktabs = T, align = "c", linesep = "", caption="The top abundant ASVs")%>%
+  kable_styling(latex_options = "HOLD_position")
+
+#write.csv(fchanged_gly_exp1_out, "paper_tables/fchanged_gly_exp1.csv")
 
 #tb
 temp <-   sensitive_to_herbicide(fDESIGN, fDAT, fTAX, c("ctr","tb"), c(2,5), 1, species = "fungi")
@@ -916,9 +969,13 @@ temp <- cRA_Herbicide(fDESIGN, fDAT_rare, c("ctr","tb"), c(2,5), 1, fchanged_tb_
 fCRA_tb_exp1 <- temp[[1]]
 fchanged_tb_exp1 <- temp[[3]]
 
-pander(fEDGER_summary_tb_exp1, justify='left', caption = "Fungi: Terbuthylazine effect in experiment 1") 
-print(paste0(round(fCRA_tb_exp1, 2), "%", " of the fungal abundance changed after spraying terbuthylazine"))
-pander(fchanged_tb_exp1[1:min(10, nrow(fchanged_tb_exp1)), c(2,3,10,12)], caption="The top abundant ASVs")
+pander(fEDGER_summary_tb_exp1[,c(3,2,1)], justify='left', caption = "Fungi: Terbuthylazine effect in experiment 1") 
+print(paste0(round(fCRA_tb_exp1, 2), "%", " of the fungal abundance changed after applying terbuthylazine"))
+fchanged_tb_exp1_out <- fchanged_tb_exp1[, c(2,3,11,13,14)]
+kbl(fchanged_tb_exp1_out[1:min(10, nrow(fchanged_tb_exp1_out)),], booktabs = T, align = "c", linesep = "", caption="The top abundant ASVs")%>%
+  kable_styling(latex_options = "HOLD_position")
+
+#write.csv(fchanged_tb_exp1_out, "paper_tables/fchanged_tb_exp1.csv")
 
 ```
 
@@ -941,9 +998,13 @@ temp <- cRA_Herbicide(fDESIGN, fDAT_rare, c("ctr","gly"), c(2,5), 2, fchanged_gl
 fCRA_gly_exp2 <- temp[[1]]
 fchanged_gly_exp2 <- temp[[3]]
 
-pander(fEDGER_summary_gly_exp2, justify='left', caption = "Fungi: Glyphosate effect in experiment 2") 
-print(paste0(round(fCRA_gly_exp2, 2), "%", " of the fungal abundance changed after spraying glyphosate"))
-pander(fchanged_gly_exp2[1:min(10, nrow(fchanged_gly_exp2)), c(2,3,11,13)], caption="The top abundant ASVs")
+pander(fEDGER_summary_gly_exp2[,c(3,2,1)], justify='left', caption = "Fungi: Glyphosate effect in experiment 2") 
+print(paste0(round(fCRA_gly_exp2, 2), "%", " of the fungal abundance changed after applying glyphosate"))
+fchanged_gly_exp2_out <- fchanged_gly_exp2[, c(2,3,11,13,14)]
+kbl(fchanged_gly_exp2_out[1:min(10, nrow(fchanged_gly_exp2_out)),], booktabs = T, align = "c", linesep = "", caption="The top abundant ASVs")%>%
+  kable_styling(latex_options = "HOLD_position")
+
+#write.csv(fchanged_gly_exp2_out, "paper_tables/fchanged_gly_exp2.csv")
 
 #tb
 temp <-   sensitive_to_herbicide(fDESIGN, fDAT, fTAX, c("ctr","tb"), c(2,5), 2, species = "fungi")
@@ -958,13 +1019,17 @@ temp <- cRA_Herbicide(fDESIGN, fDAT_rare, c("ctr","tb"), c(2,5), 2, fchanged_tb_
 fCRA_tb_exp2 <- temp[[1]]
 fchanged_tb_exp2 <- temp[[3]]
 
-pander(fEDGER_summary_tb_exp2, justify='left', caption = "Fungi: Terbuthylazine effect in experiment 2") 
-print(paste0(round(fCRA_tb_exp2, 2), "%", " of the fungal abundance changed after spraying terbuthylazine"))
-pander(fchanged_tb_exp2[1:min(10, nrow(fchanged_tb_exp2)), c(2,3,11,13)], caption="The top abundant ASVs")
+pander(fEDGER_summary_tb_exp2[,c(3,2,1)], justify='left', caption = "Fungi: Terbuthylazine effect in experiment 2") 
+print(paste0(round(fCRA_tb_exp2, 2), "%", " of the fungal abundance changed after applying terbuthylazine"))
+fchanged_tb_exp2_out <- fchanged_tb_exp2[, c(2,3,11,13,14)]
+kbl(fchanged_tb_exp2_out[1:min(10, nrow(fchanged_tb_exp2_out)),], booktabs = T, align = "c", linesep = "", caption="The top abundant ASVs")%>%
+  kable_styling(latex_options = "HOLD_position")
+
+#write.csv(fchanged_tb_exp2_out, "paper_tables/fchanged_tb_exp2.csv")
 
 ```
 
-Glyphosate changed the abundance of `r paste(length(fEDGER_fit_lrt_table_ASVs_gly_exp1))` bacterial ASVs in experiment 1 and `r paste(length(fEDGER_fit_lrt_table_ASVs_gly_exp2))` bacterial ASVs in experiment 2. Spraying terbuthylazine led to changes in abundance for `r paste(length(fEDGER_fit_lrt_table_ASVs_tb_exp1))` bacterial ASVs in experiment 1 and `r paste(length(fEDGER_fit_lrt_table_ASVs_tb_exp2))` bacterial ASVs in experiment 2.
+Glyphosate changed the abundance of `r paste(length(fEDGER_fit_lrt_table_ASVs_gly_exp1))` bacterial ASVs in experiment 1 and `r paste(length(fEDGER_fit_lrt_table_ASVs_gly_exp2))` bacterial ASVs in experiment 2. Applying terbuthylazine led to changes in abundance for `r paste(length(fEDGER_fit_lrt_table_ASVs_tb_exp1))` bacterial ASVs in experiment 1 and `r paste(length(fEDGER_fit_lrt_table_ASVs_tb_exp2))` bacterial ASVs in experiment 2.
 
 ### Figure 7.2 | Fungi: MA & venn
 
@@ -986,6 +1051,7 @@ rm(df1, df2)
 
 #get up and down-regulated ASVs
 df$cols <- "NS"
+#df$logFC <- df$logFC * (-1) #change from hc:ctr to ctr:hc #change from hc:ctr to ctr:hc
 df$cols[df$FDR < 0.05 & df$logFC > 0] <- "higher in ctr"
 df$cols[df$FDR < 0.05 & df$logFC < 0] <- "higher in gly"
 
@@ -1015,6 +1081,7 @@ rm(df1, df2)
 
 #get up and down-regulated ASVs
 df$cols <- "NS"
+#df$logFC <- df$logFC * (-1) #change from hc:ctr to ctr:hc #change from hc:ctr to ctr:hc
 df$cols[df$FDR < 0.05 & df$logFC > 0] <- "higher in ctr"
 df$cols[df$FDR < 0.05 & df$logFC < 0] <- "higher in tb"
 
@@ -1041,30 +1108,30 @@ fig7.2.1 <- plot_grid(fig7.2.1_gly + theme(legend.position="none", plot.margin =
 
 #higher in ctr
 #sensitive fungi gly
-exp1_ASV_higher <- unique(fEDGER_fit_lrt_table_gly_exp1[["table"]][["ASV_ID"]][fEDGER_fit_lrt_table_gly_exp1[["table"]][["logFC"]]>0])
-exp2_ASV_higher <- unique(fEDGER_fit_lrt_table_gly_exp2[["table"]][["ASV_ID"]][fEDGER_fit_lrt_table_gly_exp2[["table"]][["logFC"]]>0])
+exp1_ASV_higher <- fchanged_gly_exp1$ASV_ID[fchanged_gly_exp1$`logFC ctr:hc`>0]
+exp2_ASV_higher <- fchanged_gly_exp2$ASV_ID[fchanged_gly_exp2$`logFC ctr:hc`>0]
 list_venn_gly <- list(exp1_higher = exp1_ASV_higher, exp2_higher = exp2_ASV_higher)
 #relative abundance
-fCRA_higher_gly_exp1 <- cRA_Spraying(fDESIGN, fDAT_rare, c("ctr","gly"), c(2,5), 1, fchanged_gly_exp1[fchanged_gly_exp1$logFC > 0,])[[1]]
-fCRA_higher_gly_exp2 <- cRA_Spraying(fDESIGN, fDAT_rare, c("ctr","gly"), c(2,5), 2, fchanged_gly_exp2[fchanged_gly_exp2$logFC > 0,])[[1]]
+fCRA_higher_gly_exp1 <- cRA_Application(fDESIGN, fDAT_rare, c("ctr","gly"), c(2,5), 1, fchanged_gly_exp1[fchanged_gly_exp1$`logFC ctr:hc` > 0,])[[1]]
+fCRA_higher_gly_exp2 <- cRA_Application(fDESIGN, fDAT_rare, c("ctr","gly"), c(2,5), 2, fchanged_gly_exp2[fchanged_gly_exp2$`logFC ctr:hc` > 0,])[[1]]
 #sensitive fungi tb
-exp1_ASV_higher <- unique(fEDGER_fit_lrt_table_tb_exp1[["table"]][["ASV_ID"]][fEDGER_fit_lrt_table_tb_exp1[["table"]][["logFC"]]>0])
-exp2_ASV_higher <- unique(fEDGER_fit_lrt_table_tb_exp2[["table"]][["ASV_ID"]][fEDGER_fit_lrt_table_tb_exp2[["table"]][["logFC"]]>0])
+exp1_ASV_higher <- fchanged_tb_exp1$ASV_ID[fchanged_tb_exp1$`logFC ctr:hc`>0]
+exp2_ASV_higher <- fchanged_tb_exp2$ASV_ID[fchanged_tb_exp2$`logFC ctr:hc`>0]
 list_venn_tb <- list(exp1_higher = exp1_ASV_higher, exp2_higher = exp2_ASV_higher)
 #relative abundance
-fCRA_higher_tb_exp1 <- cRA_Spraying(fDESIGN, fDAT_rare, c("ctr","tb"), c(2,5), 1, fchanged_tb_exp1[fchanged_tb_exp1$logFC > 0,])[[1]]
-fCRA_higher_tb_exp2 <- cRA_Spraying(fDESIGN, fDAT_rare, c("ctr","tb"), c(2,5), 2, fchanged_tb_exp2[fchanged_tb_exp2$logFC > 0,])[[1]]
+fCRA_higher_tb_exp1 <- cRA_Application(fDESIGN, fDAT_rare, c("ctr","tb"), c(2,5), 1, fchanged_tb_exp1[fchanged_tb_exp1$`logFC ctr:hc` > 0,])[[1]]
+fCRA_higher_tb_exp2 <- cRA_Application(fDESIGN, fDAT_rare, c("ctr","tb"), c(2,5), 2, fchanged_tb_exp2[fchanged_tb_exp2$`logFC ctr:hc` > 0,])[[1]]
 
 #labels
 list_venn <- c(list_venn_gly, list_venn_tb)
-labels <- c(paste0("exp 1\ncRA:", round(fCRA_higher_gly_exp1, 2), "%"), 
-            paste0("exp 2\ncRA:", round(fCRA_higher_gly_exp2, 2), "%"),
-            paste0("exp 1\ncRA:", round(fCRA_higher_tb_exp1, 2), "%"), 
-            paste0("exp 2\ncRA:", round(fCRA_higher_tb_exp2, 2), "%"))
+labels <- c(paste0("exp 1\ncRA: ", round(fCRA_higher_gly_exp1, 2), "%"), 
+            paste0("exp 2\ncRA: ", round(fCRA_higher_gly_exp2, 2), "%"),
+            paste0("exp 1\ncRA: ", round(fCRA_higher_tb_exp1, 2), "%"), 
+            paste0("exp 2\ncRA: ", round(fCRA_higher_tb_exp2, 2), "%"))
 names(list_venn) <- labels
 
 #plot
-fvenn_h <- ggvenn(list_venn, fill_color = c(col_gly_up, col_gly_up, col_tb_up, col_tb_up), stroke_size = 0.5, set_name_size = 1.5, show_percentage = F) +
+fvenn_h <- ggvenn(list_venn, fill_color = c(col_gly_up, col_gly_up, col_tb_up, col_tb_up), stroke_size = 0.5, set_name_size = 2, show_percentage = F) +
   facet_wrap(~"higher in ctr")+ #to set title
   theme_bw()+ #to get grey title box
   theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),
@@ -1074,30 +1141,30 @@ fvenn_h <- ggvenn(list_venn, fill_color = c(col_gly_up, col_gly_up, col_tb_up, c
 
 #lower in ctr
 #sensitive fungi gly
-exp1_ASV_lower <- unique(fEDGER_fit_lrt_table_gly_exp1[["table"]][["ASV_ID"]][fEDGER_fit_lrt_table_gly_exp1[["table"]][["logFC"]]<0])
-exp2_ASV_lower <- unique(fEDGER_fit_lrt_table_gly_exp2[["table"]][["ASV_ID"]][fEDGER_fit_lrt_table_gly_exp2[["table"]][["logFC"]]<0])
+exp1_ASV_lower <- fchanged_gly_exp1$ASV_ID[fchanged_gly_exp1$`logFC ctr:hc`<0]
+exp2_ASV_lower <- fchanged_gly_exp2$ASV_ID[fchanged_gly_exp2$`logFC ctr:hc`<0]
 list_venn_gly <- list(exp1_lower = exp1_ASV_lower, exp2_lower = exp2_ASV_lower)
 #relative abundance
-fCRA_lower_gly_exp1 <- cRA_Spraying(fDESIGN, fDAT_rare, c("ctr","gly"), c(2,5), 1, fchanged_gly_exp1[fchanged_gly_exp1$logFC < 0,])[[1]]
-fCRA_lower_gly_exp2 <- cRA_Spraying(fDESIGN, fDAT_rare, c("ctr","gly"), c(2,5), 2, fchanged_gly_exp2[fchanged_gly_exp2$logFC < 0,])[[1]]
+fCRA_lower_gly_exp1 <- cRA_Application(fDESIGN, fDAT_rare, c("ctr","gly"), c(2,5), 1, fchanged_gly_exp1[fchanged_gly_exp1$`logFC ctr:hc` < 0,])[[1]]
+fCRA_lower_gly_exp2 <- cRA_Application(fDESIGN, fDAT_rare, c("ctr","gly"), c(2,5), 2, fchanged_gly_exp2[fchanged_gly_exp2$`logFC ctr:hc` < 0,])[[1]]
 #sensitive fungi tb
-exp1_ASV_lower <- unique(fEDGER_fit_lrt_table_tb_exp1[["table"]][["ASV_ID"]][fEDGER_fit_lrt_table_tb_exp1[["table"]][["logFC"]]<0])
-exp2_ASV_lower <- unique(fEDGER_fit_lrt_table_tb_exp2[["table"]][["ASV_ID"]][fEDGER_fit_lrt_table_tb_exp2[["table"]][["logFC"]]<0])
+exp1_ASV_lower <- fchanged_tb_exp1$ASV_ID[fchanged_tb_exp1$`logFC ctr:hc`<0]
+exp2_ASV_lower <- fchanged_tb_exp2$ASV_ID[fchanged_tb_exp2$`logFC ctr:hc`<0]
 list_venn_tb <- list(exp1_lower = exp1_ASV_lower, exp2_lower = exp2_ASV_lower)
 #relative abundance
-fCRA_lower_tb_exp1 <- cRA_Spraying(fDESIGN, fDAT_rare, c("ctr","tb"), c(2,5), 1, fchanged_tb_exp1[fchanged_tb_exp1$logFC < 0,])[[1]]
-fCRA_lower_tb_exp2 <- cRA_Spraying(fDESIGN, fDAT_rare, c("ctr","tb"), c(2,5), 2, fchanged_tb_exp2[fchanged_tb_exp2$logFC < 0,])[[1]]
+fCRA_lower_tb_exp1 <- cRA_Application(fDESIGN, fDAT_rare, c("ctr","tb"), c(2,5), 1, fchanged_tb_exp1[fchanged_tb_exp1$`logFC ctr:hc` < 0,])[[1]]
+fCRA_lower_tb_exp2 <- cRA_Application(fDESIGN, fDAT_rare, c("ctr","tb"), c(2,5), 2, fchanged_tb_exp2[fchanged_tb_exp2$`logFC ctr:hc` < 0,])[[1]]
 
 #labels
 list_venn <- c(list_venn_gly, list_venn_tb)
-labels <- c(paste0("exp 1\ncRA:", round(fCRA_lower_gly_exp1, 2), "%"), 
-            paste0("exp 2\ncRA:", round(fCRA_lower_gly_exp2, 2), "%"),
-            paste0("exp 1\ncRA:", round(fCRA_lower_tb_exp1, 2), "%"), 
-            paste0("exp 2\ncRA:", round(fCRA_lower_tb_exp2, 2), "%"))
+labels <- c(paste0("exp 1\ncRA: ", round(fCRA_lower_gly_exp1, 2), "%"), 
+            paste0("exp 2\ncRA: ", round(fCRA_lower_gly_exp2, 2), "%"),
+            paste0("exp 1\ncRA: ", round(fCRA_lower_tb_exp1, 2), "%"), 
+            paste0("exp 2\ncRA: ", round(fCRA_lower_tb_exp2, 2), "%"))
 names(list_venn) <- labels
 
 #plot
-fvenn_l <- ggvenn(list_venn, fill_color = c(col_gly_up, col_gly_up, col_tb_up, col_tb_up), stroke_size = 0.5, set_name_size = 1.5, show_percentage = F) +
+fvenn_l <- ggvenn(list_venn, fill_color = c(col_gly_up, col_gly_up, col_tb_up, col_tb_up), stroke_size = 0.5, set_name_size = 2, show_percentage = F) +
   facet_wrap(~"higher in hc")+ #to set title
   theme_bw()+ #to get grey title box
   theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),
@@ -1125,7 +1192,7 @@ fig7.2 <- plot_grid(fig7.2.1 + theme(legend.position="none"),
 #saveRDS(fig7.2, "paper_figs/RDS/fig7.2.RDS")
 
 #add legend
-legend <- get_legend(pseudo + theme(legend.position="bottom") + labs(col="Spraying"))
+legend <- get_legend(pseudo + theme(legend.position="bottom") + labs(col="Application"))
 fig7.2 <- plot_grid(fig7.2, legend, nrow=2, rel_heights=c(1, .1))
 
 #print
@@ -1157,10 +1224,10 @@ fig7.2
 
 \vspace{5mm}
 
-**Conclusion:** Spraying glyphosate and terbuthylazine led to similar effect. In both experiments were around 30 ASVs sensitive in their abundance to glyphosate and terbuthylazine but non of those ASVs was sensitive in both experiments. We found high abundant bacterial ASVs reacting sensitive to herbicides which was up to 12 % of the bacterial community. Only a few fungal ASVs were changed in their abundance and non of them was sensitive for both herbicides or in both experiments.
+**Conclusion:** Applying glyphosate and terbuthylazine led to similar effect. In both experiments were around 30 ASVs sensitive in their abundance to glyphosate and terbuthylazine but non of those ASVs was sensitive in both experiments. We found high abundant bacterial ASVs reacting sensitive to herbicides which was up to 12 % of the bacterial community. Only a few fungal ASVs were changed in their abundance and non of them was sensitive for both herbicides or in both experiments.
 
 \vspace{5mm}
 
 ## Conclusion taxa response
 
-Spraying to different targets did not influence high abundant ASVs. Spraying glyphosate and terbuthylazine caused similar effects. Both altered, multiple bacterial ASVs. Almost no effect was found on fungi. Sensitive ASVs were not consistent between the two experiments.
+Applying herbicides to different targets did not influence high abundant ASVs. Applying glyphosate and terbuthylazine caused similar effects. Both altered, multiple bacterial ASVs. Almost no effect was found on fungi. Sensitive ASVs were not consistent between the two experiments.

@@ -13,7 +13,7 @@ output:
 
 # Experimental Setup
 
-Two experiments were performed. In experiment 1 (exp1) we kept a constant 60% water holding capacity (WHC) while in experiment 2 (exp2) all pots were flushed (100% WHC) before keeping a constant 60% WHC. In both experiments, we had three Herbicide (Hc) treatments: water control (ctr), glyphosate (gly) and terbuthylazine (tb) which were sprayed on two different targets: Bare soil (S) or weeds (Ca; Chenopodium album). Two weeks after spraying, maize was planted in the soil. Soil samples were collected at: 2W (2 weeks after spraying, maize planting, 7 reps. per treatment) and 5W (5 weeks after spraying, 3 weeks old maize, 7 reps. per treatment).
+Two experiments were performed. In experiment 1 (exp1) we kept a constant 60% water holding capacity (WHC) while in experiment 2 (exp2) all pots were flushed (100% WHC) before keeping a constant 60% WHC. In both experiments, we had three Herbicide (Hc) treatments: water control (ctr), glyphosate (gly) and terbuthylazine (tb) which were applied on two different targets: Bare soil (S) or weeds (Ca; Chenopodium album). Two weeks after appliying herbicides, maize was planted in the soil. Soil samples were collected at: 2W (2 weeks after herbicide application, maize planting, 7 reps. per treatment) and 5W (5 weeks after herbicide application, 3 weeks old maize, 7 reps. per treatment).
 
 
 ```{r setup, include=FALSE, echo=F, message=F, warning=F}
@@ -54,7 +54,7 @@ libraries()
 DESIGN <- readxl::read_excel(paths$DESIGN)
 
 #remove timpeoint t0
-DESIGN <- DESIGN[DESIGN$Timepoint != "0",]
+DESIGN <- DESIGN[DESIGN$Time != "0",]
 
 #change water to control
 DESIGN$Herbicide[DESIGN$Herbicide == "wat"] <- "ctr"
@@ -64,17 +64,17 @@ DESIGN$Herbicide[DESIGN$Herbicide == "wat"] <- "ctr"
 DESIGN$Experiment <- as.factor(DESIGN$Experiment)
 DESIGN$SampleType <- as.factor(DESIGN$SampleType)
 DESIGN$Herbicide <- factor(DESIGN$Herbicide, levels = c("ctr","gly","tb"))
-DESIGN$Spraying <- gsub("cheno", "weeds", DESIGN$Spraying)
-DESIGN$Spraying <- factor(DESIGN$Spraying, levels = c("soil","weeds"))
+DESIGN$Application <- gsub("cheno", "weeds", DESIGN$Application)
+DESIGN$Application <- factor(DESIGN$Application, levels = c("soil","weeds"))
 DESIGN$Taxa <- as.factor(DESIGN$Taxa)
 
 #additional columns
-DESIGN$Spraying_Timepoint <- paste(DESIGN$Spraying, DESIGN$Timepoint, sep="_")
-DESIGN$Spraying_Timepoint <- factor(DESIGN$Spraying_Timepoint,
+DESIGN$Application_Time <- paste(DESIGN$Application, DESIGN$Time, sep="_")
+DESIGN$Application_Time <- factor(DESIGN$Application_Time,
                                     levels = c("soil_2", "weeds_2",
                                                "soil_5", "weeds_5")) 
 
-DESIGN$group <- paste(DESIGN$Herbicide, DESIGN$Spraying, sep="_")
+DESIGN$group <- paste(DESIGN$Herbicide, DESIGN$Application, sep="_")
 DESIGN$group <- factor(DESIGN$group,
                                     levels = c("ctr_soil","ctr_weeds",
                                                "gly_soil","gly_weeds",
@@ -90,10 +90,10 @@ DESIGN$group_experiment <- factor(DESIGN$group_experiment,
                                                "tb_soil_2","tb_weeds_2"))
 
 
-DESIGN$herbicide_timepoint <- as.factor(paste(DESIGN$Herbicide, DESIGN$Timepoint, sep="_"))
-DESIGN$herbicide_experiment_timepoint <- as.factor(paste(DESIGN$Herbicide, DESIGN$Experiment, DESIGN$Timepoint, sep="_"))
-DESIGN$spraying_experiment_timepoint <- as.factor(paste(DESIGN$spraying, DESIGN$Experiment, DESIGN$Timepoint, sep="_"))
-DESIGN$group_experiment_timepoint <- as.factor(paste(DESIGN$group_experiment, DESIGN$Timepoint, sep="_"))
+DESIGN$herbicide_time <- as.factor(paste(DESIGN$Herbicide, DESIGN$Time, sep="_"))
+DESIGN$herbicide_experiment_time <- as.factor(paste(DESIGN$Herbicide, DESIGN$Experiment, DESIGN$Time, sep="_"))
+DESIGN$application_experiment_time <- as.factor(paste(DESIGN$application, DESIGN$Experiment, DESIGN$Time, sep="_"))
+DESIGN$group_experiment_time <- as.factor(paste(DESIGN$group_experiment, DESIGN$Time, sep="_"))
 
 #colors
 DESIGN$cols_Herbicide <- NA
@@ -101,9 +101,9 @@ DESIGN$cols_Herbicide[DESIGN$Herbicide=="ctr"] <- "#404788FF"
 DESIGN$cols_Herbicide[DESIGN$Herbicide=="gly"] <- "#55C667FF"
 DESIGN$cols_Herbicide[DESIGN$Herbicide=="tb"] <- "#FDE725FF"
 
-DESIGN$cols_Spraying <- NA
-DESIGN$cols_Spraying[DESIGN$Spraying=="soil"] <- "firebrick"
-DESIGN$cols_Spraying[DESIGN$Spraying=="weeds"] <- "dodgerblue"
+DESIGN$cols_Application <- NA
+DESIGN$cols_Application[DESIGN$Application=="soil"] <- "firebrick"
+DESIGN$cols_Application[DESIGN$Application=="weeds"] <- "dodgerblue"
 
 ## collapsed color vectors
 temp <- data.frame(DESIGN$Herbicide, DESIGN$cols_Herbicide)
@@ -111,10 +111,10 @@ temp <- plyr::ddply(temp, .variables="DESIGN.cols_Herbicide", .fun=unique)
 level_cols_Herbicide <- as.character(temp[,2])
 names(level_cols_Herbicide) <- temp[,1]
 
-temp <- data.frame(DESIGN$Spraying, DESIGN$cols_Spraying)
-temp <- plyr::ddply(temp, .variables="DESIGN.cols_Spraying", .fun=unique)
-level_cols_Spraying <- as.character(temp[,2])
-names(level_cols_Spraying) <- temp[,1]
+temp <- data.frame(DESIGN$Application, DESIGN$cols_Application)
+temp <- plyr::ddply(temp, .variables="DESIGN.cols_Application", .fun=unique)
+level_cols_Application <- as.character(temp[,2])
+names(level_cols_Application) <- temp[,1]
 
 #split to bacteria and fungi
 bDESIGN <- DESIGN[DESIGN$Taxa=="b",]
@@ -361,18 +361,18 @@ f_rare <- floor(min(colSums(fDAT))/1000) * 1000  #round to the next lower 1000
 
 ## boxplot
 
-df <- data.frame(col_sum=colSums(bDAT),colnames=colnames(bDAT), Spraying=bDESIGN$Spraying, 
-                 Herbicide=bDESIGN$Herbicide, group=bDESIGN$group, Experiment=bDESIGN$Experiment, Timepoint=as.factor(bDESIGN$Timepoint),
-                 group_experiment_timepoint=bDESIGN$group_experiment_timepoint)
+df <- data.frame(col_sum=colSums(bDAT),colnames=colnames(bDAT), Application=bDESIGN$Application, 
+                 Herbicide=bDESIGN$Herbicide, group=bDESIGN$group, Experiment=bDESIGN$Experiment, Time=as.factor(bDESIGN$Time),
+                 group_experiment_time=bDESIGN$group_experiment_time)
 
 levels(df$Experiment) <- c("Experiment 1", "Experiment 2")
-levels(df$Timepoint) <- c("2w", "5w")
+levels(df$Time) <- c("2w", "5w")
 
 ylim2=boxplot.stats(df$col_sum)$stats[c(1, 5)]
 
-seq_nr <- ggplot2::ggplot(data=df, aes(x=Spraying, y=col_sum, fill=Herbicide)) + 
+seq_nr <- ggplot2::ggplot(data=df, aes(x=Application, y=col_sum, fill=Herbicide)) + 
                       geom_boxplot(position=position_dodge2(width=0.75, preserve="single"),outlier.colour = NA) + 
-                      geom_jitter(aes(col=Timepoint, group=group_experiment_timepoint), 
+                      geom_jitter(aes(col=Time, group=group_experiment_time), 
                             size=1, position=position_jitterdodge(jitter.width=0,dodge.width = 0.75))+
                       theme_bw() +
                       theme(legend.position="none") +
@@ -401,7 +401,7 @@ samples <-  ggplot(df, aes(x=x, y=col_sum, fill=Herbicide, color=Herbicide))+
                 theme_bw() +
                 theme(axis.text.x=element_blank(), axis.ticks.x=element_blank(),
                       strip.background = element_blank(), strip.text.x = element_blank(), legend.position = "none")
-                #facet_grid(.~ Spraying, scales='free_x', space="free")
+                #facet_grid(.~ Application, scales='free_x', space="free")
                 #ggtitle("Sequencing depth per sample")
 
 
@@ -418,18 +418,18 @@ bac_plot <- cowplot::plot_grid(seq_nr + theme(legend.position="none"),
 ```{r Figure 1 fungi, fig.height=5, fig.width=8, echo=F, warning=F, message=F}
 
 ## boxplot
-df <- data.frame(col_sum=colSums(fDAT),colnames=colnames(fDAT), Spraying=fDESIGN$Spraying, 
-                 Herbicide=fDESIGN$Herbicide, group=fDESIGN$group, Experiment=fDESIGN$Experiment, Timepoint=as.factor(fDESIGN$Timepoint),
-                 group_experiment_timepoint=fDESIGN$group_experiment_timepoint)
+df <- data.frame(col_sum=colSums(fDAT),colnames=colnames(fDAT), Application=fDESIGN$Application, 
+                 Herbicide=fDESIGN$Herbicide, group=fDESIGN$group, Experiment=fDESIGN$Experiment, Time=as.factor(fDESIGN$Time),
+                 group_experiment_time=fDESIGN$group_experiment_time)
 
 levels(df$Experiment) <- c("Experiment 1", "Experiment 2")
-levels(df$Timepoint) <- c("2w", "5w")
+levels(df$Time) <- c("2w", "5w")
 
 ylim2=boxplot.stats(df$col_sum)$stats[c(1, 5)]
 
-seq_nr <- ggplot(data=df, aes(x=Spraying, y=col_sum, fill=Herbicide)) + 
+seq_nr <- ggplot(data=df, aes(x=Application, y=col_sum, fill=Herbicide)) + 
               geom_boxplot(position=position_dodge2(width=0.75, preserve="single"),outlier.colour = NA) + 
-              geom_jitter(aes(col=Timepoint, group=group_experiment_timepoint), 
+              geom_jitter(aes(col=Time, group=group_experiment_time), 
                     size=1, position=position_jitterdodge(jitter.width=0,dodge.width = 0.75))+
               theme_bw() +
               theme(legend.position="none") +
@@ -457,7 +457,7 @@ samples <-  ggplot(df, aes(x=x, y=col_sum, fill=Herbicide, color=Herbicide))+
                 theme_bw() +
                 theme(axis.text.x=element_blank(), axis.ticks.x=element_blank(),
                       strip.background = element_blank(), strip.text.x = element_blank(), legend.position = "none")
-                #facet_grid(.~ Spraying, scales='free_x', space="free")
+                #facet_grid(.~ Application, scales='free_x', space="free")
                 #ggtitle("Sequencing depth per sample")
 
 
@@ -539,13 +539,13 @@ fDAT_rare <- fDAT_rare[rowSums(fDAT_rare) > 0,]  # removal of rows with 0 values
 
 ## Sample Size
 
-We discarded eight bacterial samples with too few reads per sample while we kept all fungal samples. We ended up with the following number of samples per treatment for the analysis. The samples were labeled as "Herbicide_Spraying_Experiment_Timepoint":
+We discarded eight bacterial samples with too few reads per sample while we kept all fungal samples. We ended up with the following number of samples per treatment for the analysis. The samples were labeled as "Herbicide_Application_Experiment_Time":
 
 ```{r sample size rare, warning=F, echo=F}
 
 #final number of samples
-btable <- table(bDESIGN$group_experiment_timepoint)
-ftable <- table(fDESIGN$group_experiment_timepoint)
+btable <- table(bDESIGN$group_experiment_time)
+ftable <- table(fDESIGN$group_experiment_time)
 
 #concatenate
 sample_number <- data.frame(bacteria=btable, fungi=ftable)
@@ -588,7 +588,7 @@ saveRDS(fDAT_rare, "fDAT_rare.RDS")
 saveRDS(f_rare, "f_rare.RDS")
 
 saveRDS(level_cols_Herbicide, "level_cols_Herbicide.RDS")
-saveRDS(level_cols_Spraying, "level_cols_Spraying.RDS")
+saveRDS(level_cols_Application, "level_cols_Application.RDS")
 saveRDS(bTAX_level_cols_phyla, "bTAX_level_cols_phyla.RDS")
 saveRDS(fTAX_level_cols_phyla, "fTAX_level_cols_phyla.RDS")
 

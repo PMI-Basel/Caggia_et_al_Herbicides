@@ -189,14 +189,14 @@ We got an overview over the abundance of bacterial and fungal taxonomy by showin
 bPHYSEQ_phyla_melt$group <- factor(bPHYSEQ_phyla_melt$group, levels=c("ctr_soil","ctr_weeds","gly_soil","gly_weeds","tb_soil","tb_weeds"))
 bPHYSEQ_phyla_melt$labels_2 <- forcats::fct_relevel(bPHYSEQ_phyla_melt$labels_2, "Low abundant phyla", after = 4)
 bPHYSEQ_phyla_melt <- bPHYSEQ_phyla_melt[order(bPHYSEQ_phyla_melt$group),]
-bPHYSEQ_phyla_melt <- bPHYSEQ_phyla_melt[order(bPHYSEQ_phyla_melt$Timepoint),]
+bPHYSEQ_phyla_melt <- bPHYSEQ_phyla_melt[order(bPHYSEQ_phyla_melt$Time),]
 bPHYSEQ_phyla_melt <- bPHYSEQ_phyla_melt[order(bPHYSEQ_phyla_melt$Experiment),]
 
 bPHYSEQ_phyla_melt$SampleID2 <- gsub("_(2|5)W_", "", bPHYSEQ_phyla_melt$SampleID)
 levels <- unique(bPHYSEQ_phyla_melt$SampleID2)
 bPHYSEQ_phyla_melt$SampleID2 <- factor(bPHYSEQ_phyla_melt$SampleID2, levels=levels)
-bPHYSEQ_phyla_melt$Timepoint <- as.factor(bPHYSEQ_phyla_melt$Timepoint)
-levels(bPHYSEQ_phyla_melt$Timepoint) <- c("2W", "5W")
+bPHYSEQ_phyla_melt$Time <- as.factor(bPHYSEQ_phyla_melt$Time)
+levels(bPHYSEQ_phyla_melt$Time) <- c("2W", "5W")
 levels(bPHYSEQ_phyla_melt$Experiment) <- c("Experiment 1", "Experiment 2")
 
 #plot
@@ -207,8 +207,8 @@ fig2.1 <- ggplot(bPHYSEQ_phyla_melt, aes_string(x="SampleID2", y="Abundance", fi
   scale_colour_manual(values=bcol_class)+
   scale_fill_manual(values=bcol_class) +
   guides(fill=guide_legend(title="Phylum"))+
-  facet_grid(Timepoint ~ Experiment, scale="free_x", space="free_x") +
-  geom_text(data=bPHYSEQ_phyla_melt, aes(label=paste0(Herbicide, " ", Spraying), y=-15), angle=90, check_overlap=T, size=3, hjust = 0.25) + 
+  facet_grid(Time ~ Experiment, scale="free_x", space="free_x") +
+  geom_text(data=bPHYSEQ_phyla_melt, aes(label=paste0(Herbicide, " ", Application), y=-15), angle=90, check_overlap=T, size=3, hjust = 0.25) + 
   theme_bw()+
   ggtitle("Bacteria: Taxonomy")+
   theme(axis.text.x=element_blank(), axis.ticks.x=element_blank())
@@ -229,14 +229,14 @@ print(fig2.1)
 fPHYSEQ_phyla_melt$group <- factor(fPHYSEQ_phyla_melt$group, levels=c("ctr_soil","ctr_weeds","gly_soil","gly_weeds","tb_soil","tb_weeds"))
 fPHYSEQ_phyla_melt$labels_2 <- fct_relevel(fPHYSEQ_phyla_melt$labels_2, "Low abundant phyla", after = 4)
 fPHYSEQ_phyla_melt <- fPHYSEQ_phyla_melt[order(fPHYSEQ_phyla_melt$group),]
-fPHYSEQ_phyla_melt <- fPHYSEQ_phyla_melt[order(fPHYSEQ_phyla_melt$Timepoint),]
+fPHYSEQ_phyla_melt <- fPHYSEQ_phyla_melt[order(fPHYSEQ_phyla_melt$Time),]
 fPHYSEQ_phyla_melt <- fPHYSEQ_phyla_melt[order(fPHYSEQ_phyla_melt$Experiment),]
 
 fPHYSEQ_phyla_melt$SampleID2 <- gsub("_(2|5)W_", "", fPHYSEQ_phyla_melt$SampleID)
 levels <- unique(fPHYSEQ_phyla_melt$SampleID2)
 fPHYSEQ_phyla_melt$SampleID2 <- factor(fPHYSEQ_phyla_melt$SampleID2, levels=levels)
-fPHYSEQ_phyla_melt$Timepoint <- as.factor(fPHYSEQ_phyla_melt$Timepoint)
-levels(fPHYSEQ_phyla_melt$Timepoint) <- c("2W", "5W")
+fPHYSEQ_phyla_melt$Time <- as.factor(fPHYSEQ_phyla_melt$Time)
+levels(fPHYSEQ_phyla_melt$Time) <- c("2W", "5W")
 levels(fPHYSEQ_phyla_melt$Experiment) <- c("Experiment 1", "Experiment 2")
 
 
@@ -248,8 +248,8 @@ fig2.2 <- ggplot(fPHYSEQ_phyla_melt, aes_string(x="SampleID2", y="Abundance", fi
   scale_colour_manual(values=fcol_class)+
   scale_fill_manual(values=fcol_class) +
   guides(fill=guide_legend(title="Phylum"))+
-  facet_grid(Timepoint ~ Experiment, scale="free_x", space="free_x") +
-  geom_text(data=fPHYSEQ_phyla_melt, aes(label=paste0(Herbicide, " ", Spraying), y=-15), angle=90, check_overlap=T, size=3, hjust = 0.25) + 
+  facet_grid(Time ~ Experiment, scale="free_x", space="free_x") +
+  geom_text(data=fPHYSEQ_phyla_melt, aes(label=paste0(Herbicide, " ", Application), y=-15), angle=90, check_overlap=T, size=3, hjust = 0.25) + 
   theme_bw()+
   ggtitle("Fungi: Taxonomy") +
   theme(axis.text.x=element_blank(), axis.ticks.x=element_blank())
@@ -289,7 +289,7 @@ bDESIGN_exp1 <- droplevels(bDESIGN[bDESIGN$Experiment==1,])
 bphyla_sum_exp1 <- bphyla_sum[,colnames(bphyla_sum) %in% bDESIGN_exp1$Label]
   
 bdist_exp1 <- vegdist(t(bphyla_sum_exp1), method="bray")
-bdist_paov_exp1 <- adonis2(bdist_exp1 ~ Herbicide * Spraying * Timepoint + Plate, data=bDESIGN_exp1)
+bdist_paov_exp1 <- adonis2(bdist_exp1 ~ Herbicide * Application * Time + Plate, data=bDESIGN_exp1)
 pander(bdist_paov_exp1, caption="Bacteria PERMANOVA: Experiment 1")
 
 #Experiment 2
@@ -297,7 +297,7 @@ bDESIGN_exp2 <- droplevels(bDESIGN[bDESIGN$Experiment==2,])
 bphyla_sum_exp2 <- bphyla_sum[,colnames(bphyla_sum) %in% bDESIGN_exp2$Label]
   
 bdist_exp2 <- vegdist(t(bphyla_sum_exp2), method="bray")
-bdist_paov_exp2 <- adonis2(bdist_exp2 ~ Herbicide * Spraying * Timepoint + Plate, data=bDESIGN_exp2)
+bdist_paov_exp2 <- adonis2(bdist_exp2 ~ Herbicide * Application * Time + Plate, data=bDESIGN_exp2)
 pander(bdist_paov_exp2, caption="Bacteria PERMANOVA: Experiment 1")
 
 ```
@@ -325,7 +325,7 @@ fDESIGN_exp1 <- droplevels(fDESIGN[fDESIGN$Experiment==1,])
 fphyla_sum_exp1 <- fphyla_sum[,colnames(fphyla_sum) %in% fDESIGN_exp1$Label]
   
 fdist_exp1 <- vegdist(t(fphyla_sum_exp1), method="bray")
-fdist_paov_exp1 <- adonis2(fdist_exp1 ~ Herbicide * Spraying * Timepoint + Plate, data=fDESIGN_exp1)
+fdist_paov_exp1 <- adonis2(fdist_exp1 ~ Herbicide * Application * Time + Plate, data=fDESIGN_exp1)
 pander(fdist_paov_exp1, caption="Fungi PERMANOVA: Experiment 1")
 
 #Experiment 2
@@ -333,7 +333,7 @@ fDESIGN_exp2 <- droplevels(fDESIGN[fDESIGN$Experiment==2,])
 fphyla_sum_exp2 <- fphyla_sum[,colnames(fphyla_sum) %in% fDESIGN_exp2$Label]
   
 fdist_exp2 <- vegdist(t(fphyla_sum_exp2), method="bray")
-fdist_paov_exp2 <- adonis2(fdist_exp2 ~ Herbicide * Spraying * Timepoint + Plate, data=fDESIGN_exp2)
+fdist_paov_exp2 <- adonis2(fdist_exp2 ~ Herbicide * Application * Time + Plate, data=fDESIGN_exp2)
 pander(fdist_paov_exp2, caption="Fungi PERMANOVA: Experiment 1")
 
 #export for paper

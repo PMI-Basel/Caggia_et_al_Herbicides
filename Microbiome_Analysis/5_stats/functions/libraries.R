@@ -15,7 +15,8 @@ libraries <- function(){
   if (!require(cowplot)){install.packages("cowplot")}; library(cowplot)
   if (!require(ggvenn)){install.packages("ggvenn")}; library(ggvenn)
   if (!require(pander)){install.packages("pander")}; library(pander)
-  
+  if (!require(kableExtra)){install.packages("kableExtra")}; library(kableExtra)
+
   #stats
   if (!require(emmeans)){install.packages("emmeans")}; library(emmeans)
   if (!require(multcomp)){install.packages("multcomp")}; library(multcomp)
